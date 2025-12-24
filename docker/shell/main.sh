@@ -1,0 +1,88 @@
+#!/bin/bash
+# https://www.geeksforgeeks.org/linux-unix/if-command-in-linux-with-examples/
+
+APP_HOME=${APP_HOME:-/opt/cloudlocal}
+SERVICES="${ENABLED_SERVICES:-}"
+SERVICES="${SERVICES,,}" # Lowercase for easier matching
+SERVICES="${SERVICES// /}" # Remove all spaces for easier matching
+
+PIDS=() # Array to keep track of all service PIDs
+
+# Function to stop all background processes gracefully
+cleanup() {
+  echo -e "\n[Shutdown] Gracefully terminating Cloudlocal..."
+    for pid in "${PIDS[@]}"; do
+        kill -TERM "$pid" 2>/dev/null
+    done
+  wait
+  echo "[Shutdown] All services of Cloudlocal cleaned up."
+  exit 0
+}
+
+# Trap SIGINT (Ctrl+C) and SIGTERM (Docker stop)
+trap 'cleanup' SIGINT SIGTERM
+
+contains_service() {
+  [[ ",$SERVICES," == *",${1,,},"* ]]
+}
+
+# --- Service 1: DynamoDB Local ---
+dynamodb_service() {
+  DYNAMODB_PORT=10051
+  DYNAMO_DB_LOCAL="$APP_HOME/dynamodb_local_latest"
+
+  DYNAMO_DB_PATH="$APP_HOME/dynamodb"
+  if [[ -n "${CLOUDLOCAL_VOLUME_DIR:-}" ]]; then
+    DYNAMO_DB_PATH="$CLOUDLOCAL_VOLUME_DIR/dynamodb"
+  fi
+  mkdir -p "$DYNAMO_DB_PATH"
+
+  echo "Starting DynamoDB Local"
+
+  # start DynamoDB Local
+  java --enable-native-access=ALL-UNNAMED \
+      -Djava.library.path="$DYNAMO_DB_LOCAL/DynamoDBLocal_lib" \
+      -Dsqlite4java.library.path="$DYNAMO_DB_LIB" \
+      -jar "$DYNAMO_DB_LOCAL/DynamoDBLocal.jar" \
+      -dbPath "$DYNAMO_DB_PATH" \
+      -port $DYNAMODB_PORT -sharedDb -disableTelemetry 2>&1 | \
+      grep -vE "Initializing DynamoDB Local|Port:|InMemory:|Version:|DbPath:|SharedDb:|shouldDelayTransientStatuses:|CorsParams:" &
+
+  PIDS+=($!) # Store the PID
+}
+
+# --- Go Edge Dispatcher (The "Brain") ---
+edge_dispatcher() {
+  echo "Starting CloudLocal Edge Dispatcher on port 10050..."
+  # We start this in the background just like others
+  ./cloudlocal-edge &
+  PIDS+=($!)
+}
+
+if contains_service "dynamodb"; then
+  dynamodb_service
+fi
+
+# --- Service 2: S3 Mock (Example) ---
+if contains_service "s3"; then
+  echo "Starting S3 Mock service on port 10060..."
+  # Example: Running a different jar or a python-based mock
+  # java -jar "$APP_HOME/s3_mock.jar" --port 10060 &
+  # PIDS+=($!)
+fi
+
+if [ ${#PIDS[@]} -gt 0 ]; then
+  sleep 2
+  edge_dispatcher
+fi
+
+# --- Keep alive ---
+if [ ${#PIDS[@]} -eq 0 ]; then
+  echo "No services were enabled. Check ENABLED_SERVICES env var."
+  exit 1
+fi
+
+echo "CloudLocal is up and running. Press Ctrl+C to shut down."
+
+# Wait for all background processes.
+wait

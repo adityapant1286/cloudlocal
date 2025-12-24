@@ -1,0 +1,29 @@
+services:
+  cloudlocal:
+    container_name: cloudlocal
+    image: cloudlocal:latest
+    init: true
+    build:
+      context: ./
+      dockerfile: ./docker/Dockerfile
+    ports:
+      - "10050-10070:10050-10070"
+    environment:
+      - ENABLED_SERVICES=dynamodb,s3,sqs,kms,secretsmanager
+      - AWS_ENDPOINT_OVERRIDE=http://cloudlocal:10050
+      - AWS_ACCESS_KEY_ID=cloudlocal
+      - AWS_SECRET_ACCESS_KEY=cloudlocal
+      - AWS_REGION=ap-southeast-2
+    healthcheck:
+      # We check if the port is open and responding with a 400 (which DynamoDB does for empty requests)
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:10050/health" ]
+      interval: 5s
+      timeout: 2s
+      retries: 3
+      start_period: 10s
+    networks:
+      - local-network
+
+networks:
+  local-network:
+    driver: bridge

@@ -1,20 +1,44 @@
 package main
 
 import (
-	"fmt"
+	"cloudlocal/kms"
+	"cloudlocal/servicediscovery"
+	"cloudlocal/utils"
+	"log"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"strings"
 )
 
-//TIP <p>To run your code, right-click the code and select <b>Run</b>.</p> <p>Alternatively, click
-// the <icon src="AllIcons.Actions.Execute"/> icon in the gutter and select the <b>Run</b> menu item from here.</p>
 func main() {
-	//TIP <p>Press <shortcut actionId="ShowIntentionActions"/> when your caret is at the underlined text
-	// to see how GoLand suggests fixing the warning.</p><p>Alternatively, if available, click the lightbulb to view possible fixes.</p>
-	s := "gopher"
-	fmt.Printf("Hello and welcome, %s!\n", s)
+	//env := os.Environ()
+	//for k, v := range env {
+	//	log.Println(k, "=", v)
+	//}
+	// Setup Proxy for DynamoDB (running internally on 10051)
+	dynamoURL, _ := url.Parse("http://localhost:10051")
+	proxy := httputil.NewSingleHostReverseProxy(dynamoURL)
 
-	for i := 1; i <= 5; i++ {
-		//TIP <p>To start your debugging session, right-click your code in the editor and select the Debug option.</p> <p>We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-		// for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.</p>
-		fmt.Println("i =", 100/i)
-	}
+	var kmsEnabled = utils.IsServiceEnabled("kms")
+	var kmsSvc = kms.NewKmsService()
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+
+		if r.Method == "GET" && (r.URL.Path == "/health" || r.URL.Path == "/") {
+			servicediscovery.Handle(w)
+			return
+		}
+
+		target := r.Header.Get("X-Amz-Target")
+
+		if strings.HasPrefix(target, "TrentService") && kmsEnabled {
+			kmsSvc.Handle(w, r, target)
+		} else {
+			proxy.ServeHTTP(w, r)
+		}
+	})
+
+	log.Println("CloudLocal Edge listening on :10050...")
+	log.Fatal(http.ListenAndServe(":10050", nil))
 }
