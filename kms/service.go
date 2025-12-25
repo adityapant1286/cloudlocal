@@ -141,9 +141,8 @@ type persistentState struct {
 // NewKMSService is our "Constructor"
 func newKms() Kms {
 	secret := utils.GetEnv("MASTER_SECRET", "cloudlocal-secret-32-chars-long!")
-	volDir := utils.VolumeDir
 
-	kmsDir := filepath.Join(volDir, "kms")
+	kmsDir := filepath.Join(utils.VolumeDir, "kms")
 	path := filepath.Join(kmsDir, "kms_state.json")
 
 	if err := os.MkdirAll(kmsDir, 0755); err != nil {
@@ -168,7 +167,6 @@ func (s *kmsImplementation) save() {
 		Aliases: s.aliases,
 	}
 	data, _ := json.MarshalIndent(state, "", "  ")
-	//_ = os.WriteFile(s.storagePath, data, 0644)
 	err := os.WriteFile(s.storagePath, data, 0644)
 	if err != nil {
 		log.Printf("Error saving KMS state: %s", err)

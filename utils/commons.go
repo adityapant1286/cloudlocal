@@ -2,9 +2,12 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -53,10 +56,25 @@ func MarshalIjson(data any) []byte {
 	return jsonData
 }
 
+func AnyToString(v any) string {
+	switch v := v.(type) {
+	case string:
+		return v
+	case int:
+		return strconv.Itoa(v) // Use strconv for efficient numeric conversion
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	default:
+		return fmt.Sprint(v) // Fallback for other types
+	}
+}
+
 type RespInput struct {
 	Writer      http.ResponseWriter
+	Code        int
 	ContentType string
-	Data        interface{}
+	Data        any
+	ErrorStr    string
 }
 
 func RespondByInput(input RespInput) {
@@ -68,7 +86,19 @@ func RespondByInput(input RespInput) {
 }
 
 func RespondJSON(w http.ResponseWriter, data interface{}) {
-	RespondByInput(RespInput{Writer: w, Data: data, ContentType: "application/x-amz-json-1.1"})
+	RespondByInput(RespInput{
+		Writer:      w,
+		Data:        data,
+		ContentType: "application/x-amz-json-1.1",
+	})
+}
+
+func RespondError(input RespInput) {
+	input.Writer.WriteHeader(input.Code)
+	RespondJSON(input.Writer, map[string]string{
+		"__type":  input.ErrorStr,
+		"Message": AnyToString(input.Data),
+	})
 }
 
 func ExtractFieldValues[T any, R any](objs []T, fieldMapper func(T) R) []R {
@@ -80,4 +110,21 @@ func ExtractFieldValues[T any, R any](objs []T, fieldMapper func(T) R) []R {
 	}
 
 	return result
+}
+
+func FilterArr[T any](arr []T, predicate func(T) bool) []T {
+	var result []T
+	for _, v := range arr {
+		if predicate(v) {
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
+func SortArr[T any](arr []T, compare func(T, T) bool) []T {
+	sort.Slice(arr, func(i, j int) bool {
+		return compare(arr[i], arr[j])
+	})
+	return arr
 }

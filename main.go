@@ -2,6 +2,7 @@ package main
 
 import (
 	"cloudlocal/kms"
+	"cloudlocal/secretsmanager"
 	"cloudlocal/servicediscovery"
 	"cloudlocal/utils"
 	"log"
@@ -12,16 +13,19 @@ import (
 )
 
 func main() {
-	//env := os.Environ()
-	//for k, v := range env {
-	//	log.Println(k, "=", v)
-	//}
-	// Setup Proxy for DynamoDB (running internally on 10051)
 	dynamoURL, _ := url.Parse("http://localhost:10051")
 	proxy := httputil.NewSingleHostReverseProxy(dynamoURL)
 
 	var kmsEnabled = utils.IsServiceEnabled("kms")
-	var kmsSvc = kms.NewKmsService()
+	var kmsSvc kms.KmsService = nil
+	if kmsEnabled {
+		kmsSvc = kms.NewKmsService()
+	}
+	var smEnabled = utils.IsServiceEnabled("secretsmanager")
+	var smSvc secretsmanager.SecretManagerService = nil
+	if smEnabled {
+		smSvc = secretsmanager.NewSecretManagerService()
+	}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
@@ -34,6 +38,8 @@ func main() {
 
 		if strings.HasPrefix(target, "TrentService") && kmsEnabled {
 			kmsSvc.Handle(w, r, target)
+		} else if strings.HasPrefix(target, "secretsmanager") && smEnabled {
+			smSvc.Handle(w, r, target)
 		} else {
 			proxy.ServeHTTP(w, r)
 		}
