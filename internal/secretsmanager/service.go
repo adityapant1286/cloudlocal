@@ -1,7 +1,7 @@
 package secretsmanager
 
 import (
-	"cloudlocal/utils"
+	"cloudlocal/internal/utils"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,22 +13,18 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 )
 
-type SecretManagerService interface {
-	Handle(w http.ResponseWriter, r *http.Request, target string)
-}
+func NewSecretManagerService() utils.ServiceHandler {
+	var smEnabled = utils.IsServiceEnabled("secretsmanager")
 
-type smImplementation struct {
-	sm SecretsService
-}
-
-func NewSecretManagerService() SecretManagerService {
-	return &smImplementation{
-		sm: newSecretsService(),
+	if smEnabled {
+		return &smImplementation{
+			sm: newSecretsService(),
+		}
 	}
+	return nil
 }
 
 func (svc *smImplementation) Handle(w http.ResponseWriter, r *http.Request, target string) {
@@ -122,17 +118,7 @@ func (svc *smImplementation) Handle(w http.ResponseWriter, r *http.Request, targ
 	}
 }
 
-type Secret struct {
-	Name         string            `json:"Name"`
-	ARN          string            `json:"ARN"`
-	Description  string            `json:"Description"`
-	SecretString string            `json:"SecretString,omitempty"`
-	Tags         map[string]string `json:"Tags,omitempty"`
-	CreatedDate  int64             `json:"CreatedDate"`
-	LastChanged  int64             `json:"LastChangedDate"`
-}
-
-type SecretsService interface {
+type internalSecretsService interface {
 	createSecret(name, description, value string) (*Secret, error)
 	getSecretValue(name string) (*Secret, error)
 	updateSecret(name, value string) error
@@ -141,13 +127,7 @@ type SecretsService interface {
 	listSecrets(filters []Filter, sortBy, sortOrder string) ([]Secret, error)
 }
 
-type secretsImplementation struct {
-	mu          sync.RWMutex
-	store       map[string]*Secret
-	storagePath string
-}
-
-func newSecretsService() SecretsService {
+func newSecretsService() internalSecretsService {
 	smDir := filepath.Join(utils.VolumeDir, "secrets")
 	path := filepath.Join(smDir, "secrets_state.json")
 	if err := os.MkdirAll(smDir, 0755); err != nil {
@@ -292,11 +272,6 @@ func (s *secretsImplementation) listSecrets(filters []Filter, sortBy, sortOrder 
 	log.Printf("Retrieved secrets:\n%s\n\n", utils.MarshalIjson(filtered))
 
 	return filtered, nil
-}
-
-type Filter struct {
-	Key    string `json:"Key"`
-	Values []any  `json:"Values"`
 }
 
 func filterSecrets(filters []Filter, secrets []*Secret) []Secret {

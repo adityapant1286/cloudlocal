@@ -1,7 +1,7 @@
 package kms
 
 import (
-	"cloudlocal/utils"
+	"cloudlocal/internal/utils"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -15,22 +15,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 )
 
-type KmsService interface {
-	Handle(w http.ResponseWriter, r *http.Request, target string)
-}
+func NewKmsService() utils.ServiceHandler {
+	var kmsEnabled = utils.IsServiceEnabled("kms")
 
-type kmsServiceImplementation struct {
-	kms Kms
-}
-
-func NewKmsService() KmsService {
-	return &kmsServiceImplementation{
-		kms: newKms(),
+	if kmsEnabled {
+		return &kmsServiceImplementation{
+			kms: newKms(),
+		}
 	}
+	return nil
 }
 
 func (svc *kmsServiceImplementation) Handle(w http.ResponseWriter, r *http.Request, target string) {
@@ -97,24 +93,7 @@ func (svc *kmsServiceImplementation) Handle(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// KmsKey represents our key metadata
-type KmsKey struct {
-	KeyId        string `json:"KeyId"`
-	Arn          string `json:"Arn"`
-	Description  string `json:"Description"`
-	Enabled      bool   `json:"Enabled"`
-	CreationDate int64  `json:"CreationDate"` // Unix timestamp
-	KeyUsage     string `json:"KeyUsage"`
-	KeyState     string `json:"KeyState"`
-}
-
-type Alias struct {
-	AliasName   string `json:"AliasName"`
-	TargetKeyId string `json:"TargetKeyId"`
-}
-
-// Kms Interface (The "API" of our service)
-type Kms interface {
+type internalKms interface {
 	createAlias(aliasName string, targetKeyID string) error
 	createKey(description string) (*KmsKey, error)
 	decrypt(ciphertextBlob string) ([]byte, error)
@@ -124,22 +103,7 @@ type Kms interface {
 	resolveKeyId(idOrAlias string) string
 }
 
-// kmsImplementation (The "Class" with state)
-type kmsImplementation struct {
-	mu           sync.RWMutex
-	keys         map[string]*KmsKey
-	aliases      map[string]string // AliasName -> KeyID
-	masterSecret []byte            // Used for the AES-GCM encryption
-	storagePath  string            // Path to kms_state.json
-}
-
-type persistentState struct {
-	Keys    map[string]*KmsKey `json:"keys"`
-	Aliases map[string]string  `json:"aliases"`
-}
-
-// NewKMSService is our "Constructor"
-func newKms() Kms {
+func newKms() internalKms {
 	secret := utils.GetEnv("MASTER_SECRET", "cloudlocal-secret-32-chars-long!")
 
 	kmsDir := filepath.Join(utils.VolumeDir, "kms")
@@ -160,7 +124,6 @@ func newKms() Kms {
 	return svc
 }
 
-// save() writes the current state to disk
 func (s *kmsImplementation) save() {
 	state := persistentState{
 		Keys:    s.keys,

@@ -1,17 +1,10 @@
 package servicediscovery
 
 import (
-	"cloudlocal/utils"
+	"cloudlocal/internal/utils"
 	"log"
 	"net/http"
 )
-
-type ServiceStatus struct {
-	Name    string `json:"name"`
-	Status  string `json:"status"`
-	Port    int    `json:"port,omitempty"`
-	Version string `json:"version,omitempty"`
-}
 
 func Handle(w http.ResponseWriter) {
 	var activeServices []ServiceStatus

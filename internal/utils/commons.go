@@ -25,6 +25,10 @@ var EnabledServices = strings.ToLower(GetEnv("ENABLED_SERVICES", ""))
 var VolumeDir = strings.ToLower(GetEnv("CLOUDLOCAL_VOLUME_DIR", DefaultDir))
 var AWS_REGION = strings.ToLower(GetEnv("AWS_REGION", "ap-southeast-2"))
 
+type ServiceHandler interface {
+	Handle(w http.ResponseWriter, r *http.Request, target string)
+}
+
 func IsServiceEnabled(service string) bool {
 	return strings.Contains(EnabledServices, strings.ToLower(service))
 }
