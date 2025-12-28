@@ -2,12 +2,10 @@ package utils
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -60,19 +58,20 @@ func MarshalIjson(data any) []byte {
 	return jsonData
 }
 
-func AnyToString(v any) string {
-	switch v := v.(type) {
-	case string:
-		return v
-	case int:
-		return strconv.Itoa(v) // Use strconv for efficient numeric conversion
-	case float64:
-		return strconv.FormatFloat(v, 'f', -1, 64)
-	default:
-		return fmt.Sprint(v) // Fallback for other types
+/*
+	func AnyToString(v any) string {
+		switch v := v.(type) {
+		case string:
+			return v
+		case int:
+			return strconv.Itoa(v) // Use strconv for efficient numeric conversion
+		case float64:
+			return strconv.FormatFloat(v, 'f', -1, 64)
+		default:
+			return fmt.Sprint(v) // Fallback for other types
+		}
 	}
-}
-
+*/
 type RespInput struct {
 	Writer      http.ResponseWriter
 	Code        int
@@ -82,27 +81,33 @@ type RespInput struct {
 }
 
 func RespondByInput(input RespInput) {
+	//log.Printf("%s", MarshalIjson(input))
 	input.Writer.Header().Set("Content-Type", input.ContentType)
 	err := json.NewEncoder(input.Writer).Encode(input.Data)
 	if err != nil {
+		log.Fatalf("(X) Error: %s", err.Error())
 		return
 	}
 }
 
-func RespondJSON(w http.ResponseWriter, data interface{}) {
-	RespondByInput(RespInput{
-		Writer:      w,
-		Data:        data,
-		ContentType: "application/x-amz-json-1.1",
-	})
+func RespondJSON(w http.ResponseWriter, data any) {
+	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+	err := json.NewEncoder(w).Encode(data)
+	if err != nil {
+		log.Fatalf("(X) Error: %s", err.Error())
+		return
+	}
 }
 
 func RespondError(input RespInput) {
-	input.Writer.WriteHeader(input.Code)
-	RespondJSON(input.Writer, map[string]string{
+	data := map[string]any{
 		"__type":  input.ErrorStr,
-		"Message": AnyToString(input.Data),
-	})
+		"Code":    input.Code,
+		"Message": input.Data,
+	}
+	log.Printf("%d|%s\n", input.Code, MarshalIjson(data))
+	input.Writer.WriteHeader(input.Code)
+	RespondJSON(input.Writer, data)
 }
 
 func ExtractFieldValues[T any, R any](objs []T, fieldMapper func(T) R) []R {

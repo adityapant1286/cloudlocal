@@ -48,6 +48,7 @@ func (svc *kmsServiceImplementation) Handle(w http.ResponseWriter, r *http.Reque
 
 		utils.RespondJSON(w, map[string]interface{}{"KeyMetadata": key})
 		return
+
 	} else if strings.HasSuffix(target, "CreateAlias") {
 		var req struct {
 			AliasName   string `json:"AliasName"`
@@ -90,6 +91,12 @@ func (svc *kmsServiceImplementation) Handle(w http.ResponseWriter, r *http.Reque
 		plain, _ := svc.kms.decrypt(req.CiphertextBlob)
 		utils.RespondJSON(w, map[string]interface{}{"Plaintext": plain})
 
+	} else if strings.HasSuffix(target, "ListAliases") {
+		aliases, _ := svc.kms.listAliases()
+		utils.RespondJSON(w, map[string]interface{}{"Aliases": aliases})
+	} else if strings.HasSuffix(target, "ListKeys") {
+		keys, _ := svc.kms.listKeys()
+		utils.RespondJSON(w, map[string]interface{}{"Keys": keys})
 	}
 }
 
@@ -100,6 +107,7 @@ type internalKms interface {
 	describeKey(keyIdOrAlias string) (*KmsKey, error)
 	encrypt(keyId string, plaintext []byte) (string, error)
 	listAliases() ([]Alias, error)
+	listKeys() ([]KmsKey, error)
 	resolveKeyId(idOrAlias string) string
 }
 
@@ -265,10 +273,22 @@ func (s *kmsImplementation) listAliases() ([]Alias, error) {
 	defer s.mu.RUnlock()
 
 	var result []Alias
-	for name, target := range s.aliases {
-		result = append(result, Alias{AliasName: name, TargetKeyId: target})
+	for name, keyId := range s.aliases {
+		result = append(result, Alias{AliasName: name, TargetKeyId: keyId})
 	}
 	log.Printf("KMS aliases:\n%s\n\n", utils.MarshalIjson(result))
+	return result, nil
+}
+
+func (s *kmsImplementation) listKeys() ([]KmsKey, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []KmsKey
+	for _, key := range s.keys {
+		result = append(result, *key)
+	}
+	log.Printf("KMS keys:\n%s\n\n", utils.MarshalIjson(result))
 	return result, nil
 }
 

@@ -37,7 +37,16 @@ func (svc *smImplementation) Handle(w http.ResponseWriter, r *http.Request, targ
 			Description  string `json:"Description"`
 		}
 		utils.UnmarshalJson(body, &req)
-		secret, _ := svc.sm.createSecret(req.Name, req.Description, req.SecretString)
+		secret, err := svc.sm.createSecret(req.Name, req.Description, req.SecretString)
+		if err != nil {
+			utils.RespondError(utils.RespInput{
+				Writer:   w,
+				Code:     http.StatusBadRequest,
+				ErrorStr: "ResourceNotCreatedException",
+				Data:     map[string]string{"message": err.Error()},
+			})
+			return
+		}
 		utils.RespondJSON(w, secret)
 
 	} else if strings.HasSuffix(target, "GetSecretValue") {
@@ -45,7 +54,12 @@ func (svc *smImplementation) Handle(w http.ResponseWriter, r *http.Request, targ
 		utils.UnmarshalJson(body, &req)
 		secret, err := svc.sm.getSecretValue(req.SecretId)
 		if err != nil {
-			w.WriteHeader(http.StatusNotFound)
+			utils.RespondError(utils.RespInput{
+				Writer:   w,
+				Code:     http.StatusNotFound,
+				ErrorStr: "ResourceNotFoundException",
+				Data:     map[string]string{"message": err.Error()},
+			})
 			return
 		}
 		utils.RespondJSON(w, secret)
@@ -109,12 +123,19 @@ func (svc *smImplementation) Handle(w http.ResponseWriter, r *http.Request, targ
 			SortOrder string   `json:"SortOrder"`
 		}
 		utils.UnmarshalJson(body, &req)
-		secret, err := svc.sm.listSecrets(req.Filters, req.SortBy, req.SortOrder)
+		secrets, err := svc.sm.listSecrets(req.Filters, req.SortBy, req.SortOrder)
 		if err != nil {
-			w.WriteHeader(http.StatusNotFound)
+			utils.RespondError(utils.RespInput{
+				Writer:   w,
+				Code:     http.StatusNotFound,
+				ErrorStr: "ResourceNotFoundException",
+				Data:     map[string]string{"message": err.Error()},
+			})
 			return
 		}
-		utils.RespondJSON(w, secret)
+		utils.RespondJSON(w, map[string]interface{}{
+			"SecretList": secrets,
+		})
 	}
 }
 
@@ -264,9 +285,7 @@ func (s *secretsImplementation) listSecrets(filters []Filter, sortBy, sortOrder 
 	defer s.mu.RUnlock()
 
 	secrets := slices.Collect(maps.Values(s.store))
-
 	filtered := filterSecrets(filters, secrets)
-
 	filtered = utils.SortArr(filtered, secretSortFunc(sortBy, sortOrder))
 
 	log.Printf("Retrieved secrets:\n%s\n\n", utils.MarshalIjson(filtered))
