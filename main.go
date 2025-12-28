@@ -4,6 +4,7 @@ import (
 	"cloudlocal/internal/dispatcher"
 	"cloudlocal/internal/kms"
 	"cloudlocal/internal/secretsmanager"
+	"cloudlocal/internal/sqs"
 	"cloudlocal/internal/utils"
 	"log"
 	"net/http"
@@ -22,6 +23,7 @@ func main() {
 	appDispatcher := &dispatcher.Dispatcher{
 		KmsSvc: kms.NewKmsService(),
 		SmSvc:  smSvc,
+		SqsSvc: sqs.NewSQSService(),
 		Proxy:  createDynamoProxy(),
 	}
 

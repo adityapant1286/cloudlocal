@@ -10,6 +10,7 @@ import (
 type Dispatcher struct {
 	KmsSvc utils.ServiceHandler
 	SmSvc  utils.ServiceHandler
+	SqsSvc utils.ServiceHandler
 	Proxy  http.Handler // DynamoDB Proxy
 }
 
@@ -21,14 +22,27 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	amzTarget := r.Header.Get("X-Amz-Target")
+	contentType := r.Header.Get("Content-Type")
 
-	if strings.HasPrefix(amzTarget, "TrentService") && d.KmsSvc != nil {
+	if strings.HasPrefix(amzTarget, "TrentService") &&
+		d.KmsSvc != nil {
+
 		d.KmsSvc.Handle(w, r, amzTarget)
 		return
 	}
 
-	if strings.HasPrefix(amzTarget, "secretsmanager") && d.SmSvc != nil {
+	if strings.HasPrefix(amzTarget, "secretsmanager") &&
+		d.SmSvc != nil {
+
 		d.SmSvc.Handle(w, r, amzTarget)
+		return
+	}
+
+	if (strings.HasPrefix(amzTarget, "AmazonSQS") ||
+		contentType == "application/x-www-form-urlencoded") &&
+		d.SqsSvc != nil {
+
+		d.SqsSvc.Handle(w, r, amzTarget)
 		return
 	}
 

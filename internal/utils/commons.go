@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -56,6 +57,14 @@ func MarshalIjson(data any) []byte {
 	}
 
 	return jsonData
+}
+
+func ToInt(s string) int {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	}
+	return i
 }
 
 /*
