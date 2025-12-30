@@ -20,9 +20,13 @@ func GetEnv(key string, fallback string) string {
 	return value
 }
 
+// http://localhost:10050
+var Port = "10050"
+var CloudLocalUrl = "http://localhost:" + Port
+var AccountId = "123456789012"
 var EnabledServices = strings.ToLower(GetEnv("ENABLED_SERVICES", ""))
 var VolumeDir = strings.ToLower(GetEnv("CLOUDLOCAL_VOLUME_DIR", DefaultDir))
-var AWS_REGION = strings.ToLower(GetEnv("AWS_REGION", "ap-southeast-2"))
+var AwsRegion = strings.ToLower(GetEnv("AWS_REGION", "ap-southeast-2"))
 
 type ServiceHandler interface {
 	Handle(w http.ResponseWriter, r *http.Request, target string)

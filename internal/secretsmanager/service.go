@@ -186,8 +186,7 @@ func (s *secretsImplementation) createSecret(name, desc, value string) (*Secret,
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	region := os.Getenv("AWS_REGION")
-	arn := fmt.Sprintf("arn:aws:secretsmanager:%s:123456789012:secret:%s", region, name)
+	arn := fmt.Sprintf("arn:aws:secretsmanager:%s:%s:secret:%s", utils.AwsRegion, utils.AccountId, name)
 
 	now := time.Now().Unix()
 	secret := &Secret{

@@ -32,7 +32,7 @@ func Handle(w http.ResponseWriter) {
 	data := map[string]interface{}{
 		"ok":       true,
 		"services": serviceNames,
-		"region":   utils.AWS_REGION,
+		"region":   utils.AwsRegion,
 	}
 	log.Printf("Service Discovery resp:\n%s\n\n", utils.MarshalIjson(data))
 

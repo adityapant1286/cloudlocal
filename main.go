@@ -27,7 +27,7 @@ func main() {
 		Proxy:  createDynamoProxy(),
 	}
 
-	log.Println("CloudLocal Edge listening on :10050...")
+	log.Printf("CloudLocal Edge listening on :%s...", utils.Port)
 	log.Fatal(http.ListenAndServe(":10050", appDispatcher))
 }
 

@@ -179,7 +179,7 @@ func (s *kmsImplementation) createKey(description string) (*KmsKey, error) {
 
 	id := fmt.Sprintf("%d", len(s.keys)+1) // Simple ID generation
 	keyId := fmt.Sprintf("1234abcd-12ab-34cd-56ef-12345678%04s", id)
-	arn := fmt.Sprintf("arn:aws:kms:%s:123456789012:key/%s", utils.AWS_REGION, keyId)
+	arn := fmt.Sprintf("arn:aws:kms:%s:%s:key/%s", utils.AwsRegion, utils.AccountId, keyId)
 
 	newKey := &KmsKey{
 		KeyId:        keyId,

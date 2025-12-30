@@ -73,7 +73,6 @@ func (svc *sqsImplementation) Handle(w http.ResponseWriter, r *http.Request, tar
 			return
 		}
 		utils.RespondJSON(w, map[string]interface{}{"Messages": msgs})
-
 	case "DeleteMessage":
 		url := r.FormValue("QueueUrl")
 		handle := r.FormValue("ReceiptHandle")
@@ -88,10 +87,22 @@ func (svc *sqsImplementation) Handle(w http.ResponseWriter, r *http.Request, tar
 			return
 		}
 		w.WriteHeader(200)
+	case "PurgeQueue":
+		url := r.FormValue("QueueUrl")
+		err := svc.sqs.purgeQueue(url)
+		if err != nil {
+			utils.RespondError(utils.RespInput{
+				Writer:   w,
+				Code:     http.StatusBadRequest,
+				ErrorStr: "QueueDoesNotExist",
+				Data:     map[string]string{"message": err.Error()},
+			})
+			return
+		}
+		w.WriteHeader(200)
 	case "SetQueueAttributes":
 		url := r.FormValue("QueueUrl")
 		// AWS sends attributes as Attribute.1.Name=RedrivePolicy & Attribute.1.Value={...}
-		// Simplified for mock:
 		policyJson := r.FormValue("Attribute.1.Value")
 
 		var policy RedrivePolicy
@@ -107,6 +118,7 @@ type internalSqsService interface {
 	sendMessage(queueURL, body string) (*Message, error)
 	receiveMessage(queueURL string, maxMessages int) ([]Message, error)
 	deleteMessage(queueURL, receiptHandle string) error
+	purgeQueue(queueURL string) error
 	setRedrivePolicy(queueURL string, policy *RedrivePolicy)
 }
 
@@ -120,8 +132,13 @@ func (s *sqsQueueImplementation) createQueue(name string) (*Queue, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	url := fmt.Sprintf("http://localhost:10050/sqs/%s", name)
-	q := &Queue{URL: url, Messages: []Message{}}
+	arn := fmt.Sprintf("arn:aws:sqs:%s:%s:%s", utils.AwsRegion, utils.AccountId, name)
+	url := fmt.Sprintf("%s/sqs/%s", utils.CloudLocalUrl, name)
+	q := &Queue{
+		URL:      url,
+		ARN:      arn,
+		Messages: []Message{},
+	}
 	s.queues[url] = q
 
 	log.Printf("Created SQS Queue:\n%s\n\n", utils.MarshalIjson(q))
@@ -222,6 +239,27 @@ func (s *sqsQueueImplementation) deleteMessage(queueURL, receiptHandle string) e
 		"OldNumberOfMessages":       beforeDelete,
 		"RemainingNumberOfMessages": len(queue.Messages),
 	}))
+	return nil
+}
+
+func (s *sqsQueueImplementation) purgeQueue(queueURL string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	queue, ok := s.queues[queueURL]
+	if !ok {
+		return errors.New("QueueDoesNotExist")
+	}
+
+	noOfMsgs := len(queue.Messages)
+
+	// Efficiently clear the slice
+	queue.Messages = []Message{}
+	log.Printf("Purged SQS Queue:\n%s\n\n", utils.MarshalIjson(map[string]any{
+		"QueueUrl":               queueURL,
+		"NumberOfMessagesPurged": noOfMsgs,
+	}))
+
 	return nil
 }
 
