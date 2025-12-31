@@ -63,14 +63,6 @@ if contains_service "dynamodb"; then
   dynamodb_service
 fi
 
-# --- Service 2: S3 Mock (Example) ---
-if contains_service "s3"; then
-  echo "Starting S3 Mock service on port 10060..."
-  # Example: Running a different jar or a python-based mock
-  # java -jar "$APP_HOME/s3_mock.jar" --port 10060 &
-  # PIDS+=($!)
-fi
-
 if [ ${#PIDS[@]} -gt 0 ]; then
   sleep 2
   edge_dispatcher

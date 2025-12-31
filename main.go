@@ -7,11 +7,15 @@ import (
 	"cloudlocal/internal/secretsmanager"
 	"cloudlocal/internal/sqs"
 	"cloudlocal/internal/utils"
+	"embed"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 )
+
+//go:embed ui/*
+var uiFiles embed.FS
 
 func main() {
 
@@ -20,6 +24,7 @@ func main() {
 		SmSvc:  secretsmanager.NewSecretManagerService(),
 		SqsSvc: sqs.NewSQSService(),
 		S3Svc:  s3.NewS3Service(),
+		UI:     uiFiles,
 		Proxy:  createDynamoProxy(),
 	}
 

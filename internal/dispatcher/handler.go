@@ -1,26 +1,42 @@
 package dispatcher
 
 import (
-	"cloudlocal/internal/servicediscovery"
+	"cloudlocal/internal/health"
 	"cloudlocal/internal/utils"
+	"encoding/json"
+	"io/fs"
 	"net/http"
 	"strings"
 )
 
-type Dispatcher struct {
-	KmsSvc utils.ServiceHandler
-	SmSvc  utils.ServiceHandler
-	SqsSvc utils.ServiceHandler
-	S3Svc  utils.ServiceHandler
-	Proxy  http.Handler // DynamoDB Proxy
-}
-
 func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	if r.Method == "GET" && (r.URL.Path == "/health" || r.URL.Path == "/") {
-		servicediscovery.Handle(w)
+	if r.Method == "GET" && r.URL.Path == "/dashboard" && utils.DashboardEnabled {
+		http.Redirect(w, r, "/dashboard/", http.StatusFound)
 		return
 	}
+
+	if strings.HasPrefix(r.URL.Path, "/dashboard") {
+		if !utils.DashboardEnabled {
+			http.Error(w, "Dashboard disabled", http.StatusNotFound)
+			return
+		}
+
+		// Handle API calls specifically
+		if strings.HasPrefix(r.URL.Path, "/dashboard/api") {
+			d.HandleDashboardAPI(w, r)
+			return
+		}
+
+		// Handle Static Files
+		d.HandleDashboard(w, r)
+		return
+	}
+
+	//if r.Method == "GET" && (r.URL.Path == "/health" || r.URL.Path == "/") {
+	//	servicediscovery.Handle(w)
+	//	return
+	//}
 
 	amzTarget := r.Header.Get("X-Amz-Target")
 	contentType := r.Header.Get("Content-Type")
@@ -54,6 +70,38 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	d.Proxy.ServeHTTP(w, r)
+}
+
+func (d *Dispatcher) HandleDashboard(w http.ResponseWriter, r *http.Request) {
+	subFS, err := fs.Sub(d.UI, "ui")
+	if err != nil {
+		http.Error(w, "UI directory not found", 500)
+		return
+	}
+
+	// 2. Wrap it in a FileServer
+	server := http.FileServer(http.FS(subFS))
+
+	// 3. Strip the "/dashboard" prefix
+	// Important: Use "/dashboard/" with a trailing slash to handle sub-assets correctly
+	handler := http.StripPrefix("/dashboard/", server)
+
+	handler.ServeHTTP(w, r)
+}
+
+func (d *Dispatcher) HandleDashboardAPI(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/dashboard/api/status" {
+		resp := CombinedStatus{
+			Services: health.ProbeInternalServices(utils.EnabledServices),
+			Storage:  health.GetStorageStats(utils.VolumeDir),
+			Volume:   utils.VolumeDir,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+
+		return
+	}
 }
 
 func isS3Request(r *http.Request) bool {

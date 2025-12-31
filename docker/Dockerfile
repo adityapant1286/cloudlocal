@@ -15,8 +15,11 @@ RUN $JAVA_HOME/bin/jlink \
 FROM golang:1.25-bookworm AS go-builder
 WORKDIR /app
 COPY go.mod ./
+# Only copy go.sum if it exists
+COPY go.sum* ./
+RUN go mod download
 COPY . .
-# Compile to a static binary
+# This COPY captures the /ui folder for embedding
 RUN CGO_ENABLED=0 GOOS=linux go build -o cloudlocal-edge main.go
 
 # --- Stage 3: Final Slim Image ---
