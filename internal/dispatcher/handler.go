@@ -11,6 +11,7 @@ type Dispatcher struct {
 	KmsSvc utils.ServiceHandler
 	SmSvc  utils.ServiceHandler
 	SqsSvc utils.ServiceHandler
+	S3Svc  utils.ServiceHandler
 	Proxy  http.Handler // DynamoDB Proxy
 }
 
@@ -24,27 +25,39 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	amzTarget := r.Header.Get("X-Amz-Target")
 	contentType := r.Header.Get("Content-Type")
 
-	if strings.HasPrefix(amzTarget, "TrentService") &&
-		d.KmsSvc != nil {
+	if d.KmsSvc != nil &&
+		strings.HasPrefix(amzTarget, "TrentService") {
 
 		d.KmsSvc.Handle(w, r, amzTarget)
 		return
 	}
 
-	if strings.HasPrefix(amzTarget, "secretsmanager") &&
-		d.SmSvc != nil {
+	if d.SmSvc != nil &&
+		strings.HasPrefix(amzTarget, "secretsmanager") {
 
 		d.SmSvc.Handle(w, r, amzTarget)
 		return
 	}
 
-	if (strings.HasPrefix(amzTarget, "AmazonSQS") ||
-		contentType == "application/x-www-form-urlencoded") &&
-		d.SqsSvc != nil {
+	if d.SqsSvc != nil &&
+		(strings.HasPrefix(amzTarget, "AmazonSQS") ||
+			contentType == "application/x-www-form-urlencoded") {
 
 		d.SqsSvc.Handle(w, r, amzTarget)
 		return
 	}
 
+	if d.S3Svc != nil && amzTarget == "" && isS3Request(r) {
+
+		d.S3Svc.Handle(w, r, amzTarget)
+		return
+	}
+
 	d.Proxy.ServeHTTP(w, r)
+}
+
+func isS3Request(r *http.Request) bool {
+	// S3 signatures usually contain "AWS4-HMAC-SHA256" and don't use X-Amz-Target
+	return strings.Contains(r.Header.Get("Authorization"), "s3") ||
+		r.Header.Get("x-amz-content-sha256") != ""
 }

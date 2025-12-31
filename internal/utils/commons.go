@@ -2,6 +2,8 @@ package utils
 
 import (
 	"encoding/json"
+	"encoding/xml"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -27,6 +29,7 @@ var AccountId = "123456789012"
 var EnabledServices = strings.ToLower(GetEnv("ENABLED_SERVICES", ""))
 var VolumeDir = strings.ToLower(GetEnv("CLOUDLOCAL_VOLUME_DIR", DefaultDir))
 var AwsRegion = strings.ToLower(GetEnv("AWS_REGION", "ap-southeast-2"))
+var S3OwnerId = strings.ToLower(GetEnv("S3_OWNER_ID", "cloudlocal-s3-owner-id"))
 
 type ServiceHandler interface {
 	Handle(w http.ResponseWriter, r *http.Request, target string)
@@ -34,6 +37,11 @@ type ServiceHandler interface {
 
 func IsServiceEnabled(service string) bool {
 	return strings.Contains(EnabledServices, strings.ToLower(service))
+}
+
+func IsFileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func UnmarshalJsonErrors(data []byte, v any) error {
@@ -110,6 +118,27 @@ func RespondJSON(w http.ResponseWriter, data any) {
 		log.Fatalf("(X) Error: %s", err.Error())
 		return
 	}
+}
+
+func RespondXML(w http.ResponseWriter, data any) {
+	w.Header().Set("Content-Type", "application/xml")
+	_, err := w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>`))
+	if err != nil {
+		log.Fatalf("(X) Error: %s", err.Error())
+		return
+	}
+	enc := xml.NewEncoder(w)
+	enc.Indent("", "  ") // Makes it readable for debugging
+
+	eerr := enc.Encode(data)
+	if eerr != nil {
+		log.Fatalf("(X) Error: %s", eerr.Error())
+		return
+	}
+}
+
+func DecodeXml(source io.Reader, target any) error {
+	return xml.NewDecoder(source).Decode(target)
 }
 
 func RespondError(input RespInput) {

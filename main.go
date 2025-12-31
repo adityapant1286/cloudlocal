@@ -3,6 +3,7 @@ package main
 import (
 	"cloudlocal/internal/dispatcher"
 	"cloudlocal/internal/kms"
+	"cloudlocal/internal/s3"
 	"cloudlocal/internal/secretsmanager"
 	"cloudlocal/internal/sqs"
 	"cloudlocal/internal/utils"
@@ -14,16 +15,11 @@ import (
 
 func main() {
 
-	var smEnabled = utils.IsServiceEnabled("secretsmanager")
-	var smSvc utils.ServiceHandler = nil
-	if smEnabled {
-		smSvc = secretsmanager.NewSecretManagerService()
-	}
-
 	appDispatcher := &dispatcher.Dispatcher{
 		KmsSvc: kms.NewKmsService(),
-		SmSvc:  smSvc,
+		SmSvc:  secretsmanager.NewSecretManagerService(),
 		SqsSvc: sqs.NewSQSService(),
+		S3Svc:  s3.NewS3Service(),
 		Proxy:  createDynamoProxy(),
 	}
 
