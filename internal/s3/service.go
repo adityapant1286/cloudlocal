@@ -15,7 +15,16 @@ import (
 	"time"
 )
 
-func NewS3Service() utils.ServiceHandler {
+type BucketClearer interface {
+	ClearBucket(bucketName string) error
+}
+
+type ServiceHandler interface {
+	utils.ServiceHandler
+	BucketClearer
+}
+
+func NewS3Service() ServiceHandler {
 	var s3Enabled = utils.IsServiceEnabled("s3")
 
 	if s3Enabled {
@@ -191,6 +200,10 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+func (svc *s3ServiceImplementation) ClearBucket(bucketName string) error {
+	return svc.s3.clearBucket(bucketName)
+}
+
 type internalS3Service interface {
 	createBucket(name string) error
 	deleteBucket(name string) error
@@ -203,6 +216,7 @@ type internalS3Service interface {
 	initMultipartUpload(bucket, key, uploadID string) error
 	uploadPart(uploadID string, partNum int, data io.Reader) (string, error)
 	completeMultipartUpload(bucket, key, uploadID string, body io.Reader) (CompleteMultipartUploadResult, error)
+	clearBucket(bucketName string) error
 }
 
 func newS3Service() internalS3Service {
@@ -446,4 +460,19 @@ func (s *s3Implementation) completeMultipartUpload(bucket, key, uploadID string,
 		Key:      key,
 		ETag:     fmt.Sprintf("\"merged-%s\"", uploadID),
 	}, nil
+}
+
+func (s *s3Implementation) clearBucket(bucketName string) error {
+	bucketPath := filepath.Join(s.storagePath, bucketName)
+
+	// Read all files/folders inside the bucket
+	files, err := os.ReadDir(bucketPath)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		os.RemoveAll(filepath.Join(bucketPath, f.Name()))
+	}
+	return nil
 }

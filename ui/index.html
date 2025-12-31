@@ -44,6 +44,29 @@
     <div id="storage-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
     </div>
 
+    <section class="mt-10">
+      <h3 class="text-sm font-bold uppercase text-gray-500 mb-4 tracking-widest">Management Actions</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-gray-900 border border-gray-800 p-6 rounded-2xl">
+          <h4 class="text-green-400 font-bold mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            S3 Buckets
+          </h4>
+          <div id="s3-actions" class="space-y-2">
+          </div>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 p-6 rounded-2xl">
+          <h4 class="text-blue-400 font-bold mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            SQS Queues
+          </h4>
+          <div id="sqs-actions" class="space-y-2">
+          </div>
+        </div>
+      </div>
+    </section>
+
     <div class="bg-blue-900/20 border border-blue-500/30 p-6 rounded-2xl">
       <h3 class="text-blue-400 font-bold mb-2">Developer Note</h3>
       <p class="text-sm text-blue-200/70">All enabled services are available at <code>http://localhost:10050</code></p>
@@ -52,6 +75,17 @@
 </div>
 
 <script>
+  async function triggerAction(action, service, target) {
+    if (!confirm(`Are you sure you want to ${action.replace('_',' ')} for ${target}?`)) return;
+
+    await fetch('/dashboard/api/action', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ action, service, target })
+    });
+    await fetchData(); // Refresh UI
+  }
+
   async function fetchData() {
     try {
       const res = await fetch('/dashboard/api/status');
@@ -79,13 +113,21 @@
                 `).join('');
 
       document.getElementById('vol-path').innerText = data.volume_path;
+
+      const s3Container = document.getElementById('s3-actions');
+      s3Container.innerHTML = data.buckets.map(b => `
+        <div class="flex items-center justify-between p-2 hover:bg-gray-800 rounded-lg transition-colors">
+            <span class="text-sm font-mono">${b}</span>
+            <button onclick="triggerAction('clear_s3', 's3', '${b}')" class="text-xs bg-red-900/40 text-red-400 px-3 py-1 rounded-md border border-red-500/30 hover:bg-red-500 hover:text-white transition-all">Clear</button>
+        </div>
+      `).join('');
     } catch (err) {
       console.error("Dashboard sync error:", err);
     }
   }
 
   // Poll every 3 seconds
-  setInterval(fetchData, 3000);
+  // setInterval(fetchData, 3000);
   fetchData();
 </script>
 </body>

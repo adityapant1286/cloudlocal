@@ -5,6 +5,7 @@ import (
 	"cloudlocal/internal/utils"
 	"encoding/json"
 	"io/fs"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -100,6 +101,39 @@ func (d *Dispatcher) HandleDashboardAPI(w http.ResponseWriter, r *http.Request) 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
 
+		return
+	}
+
+	if r.Method == http.MethodPost && r.URL.Path == "/dashboard/api/action" {
+		var req struct {
+			Action  string `json:"action"`
+			Service string `json:"service"`
+			Target  string `json:"target"` // e.g., bucket name or queue name
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Bad Request", 400)
+			return
+		}
+
+		switch req.Action {
+		case "flush_sqs":
+			err := d.SqsSvc.FlushQueue(req.Target)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				log.Fatalf("Error flushing sqs queue: %s", err.Error())
+				return
+			}
+		case "clear_s3":
+			err := d.S3Svc.ClearBucket(req.Target)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				log.Fatalf("Error clearing s3 bucket: %s", err.Error())
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 }

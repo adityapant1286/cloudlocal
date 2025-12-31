@@ -9,7 +9,16 @@ import (
 	"time"
 )
 
-func NewSQSService() utils.ServiceHandler {
+type QueuePurger interface {
+	FlushQueue(queueURL string) error
+}
+
+type ServiceHandler interface {
+	utils.ServiceHandler
+	QueuePurger
+}
+
+func NewSQSService() ServiceHandler {
 	var sqsEnabled = utils.IsServiceEnabled("sqs")
 
 	if sqsEnabled {
@@ -111,6 +120,10 @@ func (svc *sqsImplementation) Handle(w http.ResponseWriter, r *http.Request, tar
 
 		w.WriteHeader(200)
 	}
+}
+
+func (svc *sqsImplementation) FlushQueue(queueURL string) error {
+	return svc.sqs.purgeQueue(queueURL)
 }
 
 type internalSqsService interface {
