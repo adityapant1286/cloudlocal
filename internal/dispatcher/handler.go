@@ -4,9 +4,11 @@ import (
 	"cloudlocal/internal/health"
 	"cloudlocal/internal/utils"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -25,7 +27,16 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// Handle API calls specifically
 		if strings.HasPrefix(r.URL.Path, "/dashboard/api") {
-			d.HandleDashboardAPI(w, r)
+			switch r.URL.Path {
+			case "/dashboard/api/status":
+				d.HandleDashboardAPI(w, r)
+			case "/dashboard/api/logs":
+				d.HandleLogStream(w, r)
+			case "/dashboard/api/logs/download":
+				d.HandleLogDownload(w, r)
+			case "/dashboard/api/action":
+				d.HandleDashboardAPI(w, r) // SQS Flush/S3 Clear
+			}
 			return
 		}
 
@@ -136,6 +147,66 @@ func (d *Dispatcher) HandleDashboardAPI(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+}
+
+func (d *Dispatcher) HandleLogStream(w http.ResponseWriter, r *http.Request) {
+	// Set headers for SSE
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	service := r.URL.Query().Get("service")
+
+	logPath := utils.LogDir + "/edge.log"
+	if service == "dynamodb" {
+		logPath = utils.LogDir + "/dynamodb.log"
+	}
+
+	logChan := make(chan string)
+	stopChan := make(chan struct{})
+	defer close(stopChan)
+
+	go utils.StreamLogFile(logPath, logChan, stopChan)
+
+	// Flush the response to the client immediately
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	for {
+		select {
+		case line := <-logChan:
+			// SSE format requires "data: " prefix and double newline
+			fmt.Fprintf(w, "data: %s\n\n", line)
+			flusher.Flush()
+		case <-r.Context().Done():
+			// Browser closed the connection
+			return
+		}
+	}
+}
+
+func (d *Dispatcher) HandleLogDownload(w http.ResponseWriter, r *http.Request) {
+	service := r.URL.Query().Get("service")
+	logPath := utils.LogDir + "/edge.log"
+	if service == "dynamodb" {
+		logPath = utils.LogDir + "/dynamodb.log"
+	}
+
+	// Check if file exists before trying to serve it
+	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+		http.Error(w, "Log file not found", http.StatusNotFound)
+		return
+	}
+
+	// Force the browser to download instead of displaying
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.log", service))
+	w.Header().Set("Content-Type", "text/plain")
+
+	http.ServeFile(w, r, logPath)
 }
 
 func isS3Request(r *http.Request) bool {

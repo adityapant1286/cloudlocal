@@ -26,6 +26,8 @@ contains_service() {
   [[ ",$SERVICES," == *",${1,,},"* ]]
 }
 
+mkdir -p "$APP_HOME/logs"
+
 # --- Service 1: DynamoDB Local ---
 dynamodb_service() {
   DYNAMODB_PORT=10051
@@ -37,7 +39,7 @@ dynamodb_service() {
   fi
   mkdir -p "$DYNAMO_DB_PATH"
 
-  echo "Starting DynamoDB Local"
+#  echo "Starting DynamoDB Local"
 
   # start DynamoDB Local
   java --enable-native-access=ALL-UNNAMED \
@@ -45,17 +47,17 @@ dynamodb_service() {
       -Dsqlite4java.library.path="$DYNAMO_DB_LIB" \
       -jar "$DYNAMO_DB_LOCAL/DynamoDBLocal.jar" \
       -dbPath "$DYNAMO_DB_PATH" \
-      -port $DYNAMODB_PORT -sharedDb -disableTelemetry 2>&1 | \
-      grep -vE "Initializing DynamoDB Local|Port:|InMemory:|Version:|DbPath:|SharedDb:|shouldDelayTransientStatuses:|CorsParams:" &
+      -port $DYNAMODB_PORT -sharedDb -disableTelemetry > "$APP_HOME/logs/dynamodb.log" 2>&1 &
+#      | grep -vE "Initializing DynamoDB Local|Port:|InMemory:|Version:|DbPath:|SharedDb:|shouldDelayTransientStatuses:|CorsParams:" &
 
   PIDS+=($!) # Store the PID
 }
 
 # --- Go Edge Dispatcher (The "Brain") ---
 edge_dispatcher() {
-  echo "Starting CloudLocal Edge Dispatcher on port 10050..."
+#  echo "Starting CloudLocal Edge Dispatcher on port 10050..."
   # We start this in the background just like others
-  ./cloudlocal-edge &
+  ./cloudlocal-edge > "$APP_HOME/logs/edge.log" 2>&1 &
   PIDS+=($!)
 }
 
@@ -74,7 +76,8 @@ if [ ${#PIDS[@]} -eq 0 ]; then
   exit 1
 fi
 
-echo "CloudLocal is up and running. Press Ctrl+C to shut down."
+echo "CloudLocal is up and running on port 10050..."
+echo "Press Ctrl+C to shut down."
 
 # Wait for all background processes.
 wait

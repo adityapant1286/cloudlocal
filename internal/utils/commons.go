@@ -31,6 +31,7 @@ var VolumeDir = strings.ToLower(GetEnv("CLOUDLOCAL_VOLUME_DIR", DefaultDir))
 var AwsRegion = strings.ToLower(GetEnv("AWS_REGION", "ap-southeast-2"))
 var S3OwnerId = strings.ToLower(GetEnv("S3_OWNER_ID", "cloudlocal-s3-owner-id"))
 var DashboardEnabled = GetEnv("DISABLE_DASHBOARD", "false") != "true"
+var LogDir = VolumeDir + "/logs"
 
 type ServiceHandler interface {
 	Handle(w http.ResponseWriter, r *http.Request, target string)
