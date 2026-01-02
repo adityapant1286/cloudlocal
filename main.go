@@ -5,6 +5,7 @@ import (
 	"cloudlocal/internal/kms"
 	"cloudlocal/internal/s3"
 	"cloudlocal/internal/secretsmanager"
+	"cloudlocal/internal/sns"
 	"cloudlocal/internal/sqs"
 	"cloudlocal/internal/utils"
 	"embed"
@@ -19,11 +20,14 @@ var uiFiles embed.FS
 
 func main() {
 
+	sqsService := sqs.NewSQSService()
+
 	appDispatcher := &dispatcher.Dispatcher{
 		KmsSvc: kms.NewKmsService(),
 		SmSvc:  secretsmanager.NewSecretManagerService(),
-		SqsSvc: sqs.NewSQSService(),
+		SqsSvc: sqsService,
 		S3Svc:  s3.NewS3Service(),
+		SnsSvc: sns.NewSnsService(sqsService),
 		UI:     uiFiles,
 		Proxy:  createDynamoProxy(),
 	}

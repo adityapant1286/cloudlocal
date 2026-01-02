@@ -3,6 +3,7 @@ package dispatcher
 import (
 	"cloudlocal/internal/health"
 	"cloudlocal/internal/s3"
+	"cloudlocal/internal/sns"
 	"cloudlocal/internal/sqs"
 	"cloudlocal/internal/utils"
 	"embed"
@@ -14,6 +15,7 @@ type Dispatcher struct {
 	SmSvc  utils.ServiceHandler
 	SqsSvc sqs.ServiceHandler
 	S3Svc  s3.ServiceHandler
+	SnsSvc sns.ServiceHandler
 	UI     embed.FS
 	Proxy  http.Handler // DynamoDB Proxy
 }

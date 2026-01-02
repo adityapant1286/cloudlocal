@@ -52,6 +52,8 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	amzTarget := r.Header.Get("X-Amz-Target")
 	contentType := r.Header.Get("Content-Type")
+	bodyValues := utils.ParseBody(r)
+	action := bodyValues.Get("Action")
 
 	if d.KmsSvc != nil &&
 		strings.HasPrefix(amzTarget, "TrentService") {
@@ -67,12 +69,17 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if d.SqsSvc != nil &&
-		(strings.HasPrefix(amzTarget, "AmazonSQS") ||
-			contentType == "application/x-www-form-urlencoded") {
+	if contentType == "application/x-www-form-urlencoded" {
+		if d.SqsSvc != nil && strings.HasPrefix(amzTarget, "AmazonSQS") {
 
-		d.SqsSvc.Handle(w, r, amzTarget)
-		return
+			d.SqsSvc.Handle(w, r, amzTarget)
+			return
+		}
+		if d.SnsSvc != nil && isSnsAction(action) {
+
+			d.SnsSvc.Handle(w, r, bodyValues)
+			return
+		}
 	}
 
 	if d.S3Svc != nil && amzTarget == "" && isS3Request(r) {
@@ -213,4 +220,8 @@ func isS3Request(r *http.Request) bool {
 	// S3 signatures usually contain "AWS4-HMAC-SHA256" and don't use X-Amz-Target
 	return strings.Contains(r.Header.Get("Authorization"), "s3") ||
 		r.Header.Get("x-amz-content-sha256") != ""
+}
+
+func isSnsAction(action string) bool {
+	return utils.SnsActions[action]
 }

@@ -13,9 +13,14 @@ type QueuePurger interface {
 	FlushQueue(queueURL string) error
 }
 
+type MessageSender interface {
+	SendMessage(queueURL, body string) (Message, error)
+}
+
 type ServiceHandler interface {
 	utils.ServiceHandler
 	QueuePurger
+	MessageSender
 }
 
 func NewSQSService() ServiceHandler {
@@ -124,6 +129,11 @@ func (svc *sqsImplementation) Handle(w http.ResponseWriter, r *http.Request, tar
 
 func (svc *sqsImplementation) FlushQueue(queueURL string) error {
 	return svc.sqs.purgeQueue(queueURL)
+}
+
+func (svc *sqsImplementation) SendMessage(queueURL, body string) (Message, error) {
+	message, err := svc.sqs.sendMessage(queueURL, body)
+	return *message, err
 }
 
 type internalSqsService interface {

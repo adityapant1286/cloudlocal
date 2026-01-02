@@ -1,11 +1,16 @@
 package utils
 
 import (
+	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -23,15 +28,18 @@ func GetEnv(key string, fallback string) string {
 }
 
 // http://localhost:10050
-var Port = "10050"
-var CloudLocalUrl = "http://localhost:" + Port
-var AccountId = "123456789012"
+const Port = "10050"
+const CloudLocalUrl = "http://localhost:" + Port
+const AccountId = "123456789012"
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
 var EnabledServices = strings.ToLower(GetEnv("ENABLED_SERVICES", ""))
 var VolumeDir = strings.ToLower(GetEnv("CLOUDLOCAL_VOLUME_DIR", DefaultDir))
 var AwsRegion = strings.ToLower(GetEnv("AWS_REGION", "ap-southeast-2"))
 var S3OwnerId = strings.ToLower(GetEnv("S3_OWNER_ID", "cloudlocal-s3-owner-id"))
 var DashboardEnabled = GetEnv("DISABLE_DASHBOARD", "false") != "true"
 var LogDir = VolumeDir + "/logs"
+var SnsActions = map[string]bool{"Publish": true, "CreateTopic": true, "Subscribe": true, "ListTopics": true}
 
 type ServiceHandler interface {
 	Handle(w http.ResponseWriter, r *http.Request, target string)
@@ -79,6 +87,20 @@ func ToInt(s string) int {
 		return 0
 	}
 	return i
+}
+
+func GenAlphanumeric(length int) string {
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		num, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		result[i] = charset[num.Int64()]
+	}
+	return string(result)
+}
+
+func RandomUuid() string {
+	s := "1234abcd-1ABC-1234-abcd-%s"
+	return fmt.Sprintf(s, GenAlphanumeric(12))
 }
 
 /*
@@ -152,6 +174,27 @@ func RespondError(input RespInput) {
 	log.Printf("%d|%s\n", input.Code, MarshalIjson(data))
 	input.Writer.WriteHeader(input.Code)
 	RespondJSON(input.Writer, data)
+}
+
+func ParseBody(r *http.Request) url.Values {
+	// 1. Read the entire body into memory
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		return url.Values{}
+	}
+
+	// 2. IMPORTANT: Put the body back!
+	// Because we read it, r.Body is now empty. We must refill it
+	// so the next handler (like the DynamoDB Proxy) isn't confused.
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	// 3. Parse the bytes as a URL-encoded form
+	values, err := url.ParseQuery(string(bodyBytes))
+	if err != nil {
+		return url.Values{}
+	}
+
+	return values
 }
 
 func ExtractFieldValues[T any, R any](objs []T, fieldMapper func(T) R) []R {
