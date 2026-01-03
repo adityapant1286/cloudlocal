@@ -45,11 +45,6 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//if r.Method == "GET" && (r.URL.Path == "/health" || r.URL.Path == "/") {
-	//	servicediscovery.Handle(w)
-	//	return
-	//}
-
 	amzTarget := r.Header.Get("X-Amz-Target")
 	contentType := r.Header.Get("Content-Type")
 	bodyValues := utils.ParseBody(r)
@@ -69,6 +64,11 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if d.StsSvc != nil && strings.Contains(action, "GetCallerIdentity") {
+		d.StsSvc.Handle(w, bodyValues)
+		return
+	}
+
 	if contentType == "application/x-www-form-urlencoded" {
 		if d.SqsSvc != nil && strings.HasPrefix(amzTarget, "AmazonSQS") {
 
@@ -77,7 +77,7 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if d.SnsSvc != nil && isSnsAction(action) {
 
-			d.SnsSvc.Handle(w, r, bodyValues)
+			d.SnsSvc.Handle(w, bodyValues)
 			return
 		}
 	}

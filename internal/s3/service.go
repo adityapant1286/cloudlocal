@@ -37,12 +37,13 @@ func NewS3Service() ServiceHandler {
 
 func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Request, target string) {
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	log.Printf("%s", target)
 	queryParams := r.URL.Query()
 	if len(parts) == 0 || parts[0] == "" {
 		// List Buckets (GET /)
 		resp := svc.s3.listBuckets()
 		// xml
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 		utils.RespondXML(w, resp)
 		return
 	}
@@ -59,7 +60,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 
 			etag, err := svc.s3.uploadPart(uploadID, partNum, r.Body)
 			if err != nil {
-				w.WriteHeader(404)
+				w.WriteHeader(http.StatusNotFound)
 				utils.RespondXML(w, map[string]any{
 					"Error": err.Error(),
 				})
@@ -74,7 +75,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 		// 2. Create Bucket: PUT /bucket/ (Key is empty)
 		if key == "" {
 			if err := svc.s3.createBucket(bucket); err != nil {
-				w.WriteHeader(409)
+				w.WriteHeader(http.StatusConflict)
 				utils.RespondXML(w, map[string]any{
 					"Error": err.Error(),
 				})
@@ -86,7 +87,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 
 		// 3. Put Object: PUT /bucket/key
 		if err := svc.s3.putObject(bucket, key, r.Body); err != nil {
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError)
 			utils.RespondXML(w, map[string]any{
 				"Error": err.Error(),
 			})
@@ -98,7 +99,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 		if queryParams.Get("list-type") == "2" {
 			prefix := queryParams.Get("prefix")
 			resp, _ := svc.s3.listObjectsV2(bucket, prefix)
-			w.WriteHeader(200)
+			w.WriteHeader(http.StatusOK)
 			utils.RespondXML(w, resp)
 			return
 		}
@@ -118,21 +119,21 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 	case http.MethodDelete:
 		// Single Delete: DELETE /bucket/key
 		_ = svc.s3.deleteObject(bucket, key)
-		w.WriteHeader(204) // No Content is standard for S3 Delete
+		w.WriteHeader(http.StatusNoContent) // No Content is standard for S3 Delete
 	case http.MethodPost:
 		// Initiate Multipart: POST /bucket/key?uploads
 		if queryParams.Has("uploads") {
 			uploadID := fmt.Sprintf("upload-%d", time.Now().UnixNano())
 			err := svc.s3.initMultipartUpload(bucket, key, uploadID)
 			if err != nil {
-				w.WriteHeader(422)
+				w.WriteHeader(http.StatusUnprocessableEntity)
 				utils.RespondXML(w, map[string]any{
 					"Error": err.Error(),
 				})
 				return
 			}
 
-			w.WriteHeader(200)
+			w.WriteHeader(http.StatusOK)
 			utils.RespondXML(w, InitiateMultipartUploadResult{
 				Xmlns:    "http://s3.amazonaws.com/doc/2006-03-01/",
 				Bucket:   bucket,
@@ -150,13 +151,13 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 				r.Body,
 			)
 			if err != nil {
-				w.WriteHeader(500)
+				w.WriteHeader(http.StatusInternalServerError)
 				utils.RespondXML(w, map[string]any{
 					"Error": err.Error(),
 				})
 				return
 			}
-			w.WriteHeader(200)
+			w.WriteHeader(http.StatusOK)
 			utils.RespondXML(w, res)
 			return
 		}
@@ -170,7 +171,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 			var delReq DeleteRequest
 			err := utils.DecodeXml(r.Body, &delReq)
 			if err != nil {
-				w.WriteHeader(400)
+				w.WriteHeader(http.StatusBadRequest)
 				utils.RespondXML(w, map[string]any{
 					"Error": err.Error(),
 				})
@@ -184,7 +185,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 
 			deleted, err := svc.s3.deleteObjects(bucket, keys)
 			if err != nil {
-				w.WriteHeader(500)
+				w.WriteHeader(http.StatusInternalServerError)
 				utils.RespondXML(w, map[string]any{
 					"Error": err.Error(),
 				})
@@ -194,7 +195,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 			for _, k := range deleted {
 				resp.Deleted = append(resp.Deleted, DeletedObject{Key: k})
 			}
-			w.WriteHeader(200)
+			w.WriteHeader(http.StatusOK)
 			utils.RespondXML(w, resp)
 		}
 	}

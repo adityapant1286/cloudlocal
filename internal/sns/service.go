@@ -11,7 +11,7 @@ import (
 )
 
 type ServiceHandler interface {
-	Handle(w http.ResponseWriter, r *http.Request, body url.Values)
+	Handle(w http.ResponseWriter, body url.Values)
 }
 
 func NewSnsService(sqsSvc sqs.ServiceHandler) ServiceHandler {
@@ -25,7 +25,7 @@ func NewSnsService(sqsSvc sqs.ServiceHandler) ServiceHandler {
 	return nil
 }
 
-func (svc *snsServiceImplementation) Handle(w http.ResponseWriter, r *http.Request, body url.Values) {
+func (svc *snsServiceImplementation) Handle(w http.ResponseWriter, body url.Values) {
 	action := body.Get("Action")
 
 	switch action {
@@ -38,7 +38,7 @@ func (svc *snsServiceImplementation) Handle(w http.ResponseWriter, r *http.Reque
 			},
 			"TopicArn": result.TopicArn,
 		})
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 
 	case "Publish":
 		topicArn := body.Get("TopicArn")
@@ -47,7 +47,7 @@ func (svc *snsServiceImplementation) Handle(w http.ResponseWriter, r *http.Reque
 		utils.RespondJSON(w, map[string]any{
 			"MessageId": msgId,
 		})
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 
 	case "Subscribe":
 		topicArn := body.Get("TopicArn")
@@ -56,14 +56,14 @@ func (svc *snsServiceImplementation) Handle(w http.ResponseWriter, r *http.Reque
 		utils.RespondJSON(w, map[string]any{
 			"SubscriptionArn": arn,
 		})
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 
 	case "ListTopics":
 		topics := svc.sns.listTopics()
 		utils.RespondJSON(w, map[string]any{
 			"Topics": topics,
 		})
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 	}
 }
 

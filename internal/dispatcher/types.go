@@ -5,6 +5,7 @@ import (
 	"cloudlocal/internal/s3"
 	"cloudlocal/internal/sns"
 	"cloudlocal/internal/sqs"
+	"cloudlocal/internal/sts"
 	"cloudlocal/internal/utils"
 	"embed"
 	"net/http"
@@ -16,6 +17,7 @@ type Dispatcher struct {
 	SqsSvc sqs.ServiceHandler
 	S3Svc  s3.ServiceHandler
 	SnsSvc sns.ServiceHandler
+	StsSvc sts.ServiceHandler
 	UI     embed.FS
 	Proxy  http.Handler // DynamoDB Proxy
 }

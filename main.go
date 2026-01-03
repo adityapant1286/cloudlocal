@@ -7,6 +7,7 @@ import (
 	"cloudlocal/internal/secretsmanager"
 	"cloudlocal/internal/sns"
 	"cloudlocal/internal/sqs"
+	"cloudlocal/internal/sts"
 	"cloudlocal/internal/utils"
 	"embed"
 	"log"
@@ -28,6 +29,7 @@ func main() {
 		SqsSvc: sqsService,
 		S3Svc:  s3.NewS3Service(),
 		SnsSvc: sns.NewSnsService(sqsService),
+		StsSvc: sts.NewStsService(),
 		UI:     uiFiles,
 		Proxy:  createDynamoProxy(),
 	}

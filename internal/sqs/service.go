@@ -100,7 +100,7 @@ func (svc *sqsImplementation) Handle(w http.ResponseWriter, r *http.Request, tar
 			})
 			return
 		}
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 	case "PurgeQueue":
 		url := r.FormValue("QueueUrl")
 		err := svc.sqs.purgeQueue(url)
@@ -113,7 +113,7 @@ func (svc *sqsImplementation) Handle(w http.ResponseWriter, r *http.Request, tar
 			})
 			return
 		}
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 	case "SetQueueAttributes":
 		url := r.FormValue("QueueUrl")
 		// AWS sends attributes as Attribute.1.Name=RedrivePolicy & Attribute.1.Value={...}
@@ -123,7 +123,7 @@ func (svc *sqsImplementation) Handle(w http.ResponseWriter, r *http.Request, tar
 		utils.UnmarshalJson([]byte(policyJson), &policy)
 		svc.sqs.setRedrivePolicy(url, &policy)
 
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 	}
 }
 
