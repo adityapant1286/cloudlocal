@@ -37,6 +37,11 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			case "/dashboard/api/action":
 				d.HandleDashboardAPI(w, r) // SQS Flush/S3 Clear
 			}
+
+			if strings.HasPrefix(r.URL.Path, "/dashboard/api/dynamo") {
+				d.HandleDynamoAdmin(w, r)
+			}
+
 			return
 		}
 
@@ -187,7 +192,11 @@ func (d *Dispatcher) HandleLogStream(w http.ResponseWriter, r *http.Request) {
 		select {
 		case line := <-logChan:
 			// SSE format requires "data: " prefix and double newline
-			fmt.Fprintf(w, "data: %s\n\n", line)
+			_, err := fmt.Fprintf(w, "data: %s\n\n", line)
+			if err != nil {
+				log.Printf("Error writing data: %s", err.Error())
+				return
+			}
 			flusher.Flush()
 		case <-r.Context().Done():
 			// Browser closed the connection

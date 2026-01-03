@@ -8,99 +8,414 @@
   <link type="text/css" rel="stylesheet" href="styles.css">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-neutral-950 text-slate-200 font-sans">
+<body class="bg-stone-950 text-slate-200 font-sans">
 <div class="flex h-screen">
   <!-- Sidebar -->
-  <aside class="w-56 bg-neutral-900 border-r border-neutral-800 p-6 flex flex-col">
+  <aside class="w-56 bg-stone-900 border-r border-stone-800 p-6 flex flex-col">
     <div class="mb-10">
       <h1 class="text-2xl font-black text-orange-500 tracking-tighter">CLOUD<span class="text-white">LOCAL</span></h1>
-<!--      <p class="text-xs text-gray-500 font-mono mt-1">Edge Dispatcher v1.0</p>-->
     </div>
 
     <nav class="flex-1">
+      <h2 class="text-xs uppercase tracking-widest text-gray-500 font-bold mb-4">Menu</h2>
+
+      <button onclick="showView('overview')" class="nav-link w-full flex items-center gap-3 p-2 rounded-lg text-sm font-medium transition-all hover:bg-gray-800 text-slate-300">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" stroke-width="2"/></svg>
+        System Overview
+      </button>
+
+      <button onclick="showView('dynamodb')" class="nav-link w-full flex items-center gap-3 p-2 rounded-lg text-sm font-medium transition-all hover:bg-gray-800 text-slate-300">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4" stroke-width="2"/></svg>
+        DynamoDB View
+      </button>
+      <div class="mb-4"></div>
+
       <h2 class="text-xs uppercase tracking-widest text-gray-500 font-bold mb-4">Service Status</h2>
       <div id="service-list" class="space-y-4">
       </div>
     </nav>
 
-    <div class="mt-auto pt-6 border-t border-neutral-800">
+    <div class="mt-auto pt-6 border-t border-stone-800">
       <div class="text-xs text-gray-500 italic">Volume Path:</div>
       <div id="vol-path" class="text-[10px] font-mono text-orange-400 break-all">/opt/cloudlocal</div>
     </div>
   </aside>
 
   <!-- Main contents -->
-  <main class="flex-1 overflow-y-auto p-10">
-    <div class="flex justify-between items-start mb-4">
-      <div>
-        <h2 class="text-4xl font-bold text-white tracking-tight">System Overview</h2>
-        <p class="text-gray-400 mt-2">Real-time health and storage monitoring for your AWS mocks.</p>
+  <main class="flex-1 relative overflow-hidden">
+    <!-- System Overview -->
+    <div id="view-overview" class="view-container h-full overflow-y-auto p-10">
+      <div class="flex justify-between items-start mb-4">
+        <div>
+          <h2 class="text-4xl font-bold text-white tracking-tight">System Overview</h2>
+          <p class="text-gray-400 mt-2">All enabled services are available at <code>http://localhost:10050</code></p>
+        </div>
+        <div id="global-status" class="px-4 py-2 rounded-full bg-stone-800 border border-stone-700 text-xs font-bold uppercase tracking-widest text-green-400 flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+          System Healthy
+        </div>
       </div>
-      <div id="global-status" class="px-4 py-2 rounded-full bg-neutral-800 border border-neutral-700 text-xs font-bold uppercase tracking-widest text-green-400 flex items-center gap-2">
-        <div class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
-        System Healthy
+
+      <!-- Storage -->
+      <h3 class="text-sm font-bold uppercase text-gray-500 mb-4 tracking-widest">Storage Usage</h3>
+      <div id="storage-grid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-10">
       </div>
-    </div>
 
-    <div class="bg-blue-900/20 border border-blue-500/30 p-4 rounded-2xl mb-4">
-      <h3 class="text-blue-400 font-bold mb-2">Developer Note</h3>
-      <p class="text-sm text-blue-200/70">All enabled services are available at <code>http://localhost:10050</code></p>
-    </div>
+      <!-- Management Actions -->
+      <section class="mt-10">
+        <h3 class="text-sm font-bold uppercase text-gray-500 mb-4 tracking-widest">Management Actions</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-stone-900 border border-stone-800 p-6 rounded-2xl">
+            <h4 class="text-green-400 font-bold mb-4 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              S3 Buckets
+            </h4>
+            <div id="s3-actions" class="space-y-2">
+            </div>
+          </div>
 
-    <!-- Storage -->
-    <h3 class="text-sm font-bold uppercase text-gray-500 mb-4 tracking-widest">Storage Usage</h3>
-    <div id="storage-grid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-10">
-    </div>
+          <div class="bg-stone-900 border border-stone-800 p-6 rounded-2xl">
+            <h4 class="text-blue-400 font-bold mb-4 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              SQS Queues
+            </h4>
+            <div id="sqs-actions" class="space-y-2">
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <!-- Management Actions -->
-    <section class="mt-10">
-      <h3 class="text-sm font-bold uppercase text-gray-500 mb-4 tracking-widest">Management Actions</h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl">
-          <h4 class="text-green-400 font-bold mb-4 flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            S3 Buckets
-          </h4>
-          <div id="s3-actions" class="space-y-2">
+      <!-- Log Stream -->
+      <section class="mt-10">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-bold uppercase text-gray-500 tracking-widest">Live Log Stream</h3>
+          <div class="flex items-center gap-2">
+            <label for="log-selector"></label>
+            <select id="log-selector" onchange="switchLog()" class="bg-stone-800 text-xs border border-stone-700 rounded px-2 py-1 outline-none">
+              <option value="edge">Edge Dispatcher</option>
+              <option value="dynamodb">DynamoDB Local</option>
+            </select>
+
+            <button onclick="downloadLogs()" class="flex items-center gap-1 bg-stone-800 hover:bg-stone-700 text-gray-400 hover:text-white transition-colors border border-stone-700 rounded px-2 py-1 text-xs">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              Download
+            </button>
+          </div>
+        </div>
+        <div id="log-console" class="bg-black border border-stone-800 rounded-xl p-4 h-64 overflow-y-auto font-mono text-xs text-green-300 leading-relaxed">
+          <div class="text-gray-600 italic">// Select a service to start streaming logs...</div>
+        </div>
+      </section>
+    </div>
+    <div id="view-dynamodb" class="view-container hidden h-full flex flex-row overflow-hidden">
+      <div class="w-64 bg-gray-950 border-r border-gray-800 p-6 overflow-y-auto">
+        <h3 class="text-xs font-black text-gray-500 uppercase tracking-widest mb-6">Dynamo Tables</h3>
+        <div id="ddb-table-list" class="space-y-2">
+        </div>
+      </div>
+
+      <div class="flex-1 flex flex-col bg-gray-900/20">
+        <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900/40">
+          <div class="flex items-center gap-3">
+            <div class="p-2 bg-orange-500/10 rounded-lg">
+              <svg class="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"></path>
+              </svg>
+            </div>
+            <div>
+              <h2 id="active-table-title" class="text-xl font-bold text-white leading-tight">Select a table</h2>
+              <p class="text-[10px] text-gray-500 uppercase tracking-widest font-bold mt-0.5">DynamoDB Table</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-4">
+            <button onclick="openDdbItemCreateModal()" class="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-orange-900/20">
+              + Create Item
+            </button>
+          </div>
+          <!-- Modal -->
+          <div id="ddb-item-create-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden">
+              <div class="p-6 border-b border-gray-800 flex justify-between items-center">
+                <h3 id="ddb-item-active-modal-title" class="text-lg font-bold text-white">New Item</h3>
+                <button onclick="closeDdbItemCreateModal()" class="text-gray-500 hover:text-white">✕</button>
+              </div>
+              <div class="p-6">
+                <p class="text-xs text-gray-400 mb-2">Item JSON (Auto-marshalled to DynamoDB format):</p>
+                <label for="ddb-item-json"></label>
+                <textarea id="ddb-item-json" class="w-full h-64 bg-black/50 border border-gray-800 rounded-xl p-4 text-xs font-mono text-orange-200 outline-none focus:border-orange-500 transition-colors" placeholder='{ "id": "123", "status": "active" }'></textarea>
+                <div id="ddb-item-modal-error" class="hidden mt-3 p-3 bg-red-500/10 border border-red-500/50 text-red-500 text-[10px] rounded-lg"></div>
+              </div>
+              <div class="p-6 border-t border-gray-800 flex justify-end gap-3 bg-gray-950/50">
+                <button onclick="closeDdbItemCreateModal()" class="px-4 py-2 text-xs font-bold text-gray-400 hover:text-white">Cancel</button>
+                <button onclick="saveDdbItem()" class="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-bold">Save Item</button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl">
-          <h4 class="text-blue-400 font-bold mb-4 flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            SQS Queues
-          </h4>
-          <div id="sqs-actions" class="space-y-2">
-          </div>
+        <div class="flex-1 overflow-auto">
+          <table class="w-full text-left text-xs font-mono">
+            <thead id="ddb-grid-header" class="bg-gray-800 sticky top-0 z-10"></thead>
+            <tbody id="ddb-grid-body" class="divide-y divide-gray-800/50"></tbody>
+          </table>
         </div>
       </div>
-    </section>
-
-    <!-- Log Stream -->
-    <section class="mt-10">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-sm font-bold uppercase text-gray-500 tracking-widest">Live Log Stream</h3>
-        <div class="flex items-center gap-2">
-          <label for="log-selector"></label>
-          <select id="log-selector" onchange="switchLog()" class="bg-neutral-800 text-xs border border-neutral-700 rounded px-2 py-1 outline-none">
-            <option value="edge">Edge Dispatcher</option>
-            <option value="dynamodb">DynamoDB Local</option>
-          </select>
-
-          <button onclick="downloadLogs()" class="flex items-center gap-1 bg-neutral-800 hover:bg-neutral-700 text-gray-400 hover:text-white transition-colors border border-neutral-700 rounded px-2 py-1 text-xs">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-            Download
-          </button>
-        </div>
-      </div>
-      <div id="log-console" class="bg-black border border-neutral-800 rounded-xl p-4 h-64 overflow-y-auto font-mono text-xs text-green-300 leading-relaxed">
-        <div class="text-gray-600 italic">// Select a service to start streaming logs...</div>
-      </div>
-    </section>
+    </div>
   </main>
 </div>
 
 <script>
+
+  // Dynamodb
+  const DynamoDbParser = {
+    // Convert DynamoDB JSON -> Standard JSON
+    unmarshall: function(data) {
+      if (!data || typeof data !== 'object') return data;
+      if (data.S !== undefined) return data.S;
+      if (data.N !== undefined) return Number(data.N);
+      if (data.BOOL !== undefined) return data.BOOL;
+      if (data.NULL !== undefined) return null;
+      if (data.M) {
+        let obj = {};
+        for (let k in data.M) obj[k] = this.unmarshall(data.M[k]);
+        return obj;
+      }
+      if (data.L) return data.L.map(v => this.unmarshall(v));
+      return data;
+    },
+
+    // Convert Standard JSON -> DynamoDB JSON (for Create/Update)
+    marshall: function(data) {
+      if (typeof data === 'string') return { S: data };
+      if (typeof data === 'number') return { N: data.toString() };
+      if (typeof data === 'boolean') return { BOOL: data };
+      if (data === null) return { NULL: true };
+      if (Array.isArray(data)) return { L: data.map(v => this.marshall(v)) };
+      if (typeof data === 'object') {
+        let m = {};
+        for (let k in data) m[k] = this.marshall(data[k]);
+        return { M: m };
+      }
+      return { S: String(data) };
+    }
+  };
+
+  let currentTable = null;
+  let lastKey = null;
+  let tableSchemas = {}; // Cache for { tableName: { pk: 'id', sk: 'timestamp' } }
+
+  async function selectDdbTable(tableName) {
+    // Highlight the selected button
+    document.querySelectorAll('.table-btn').forEach(b => b.classList.remove('bg-gray-800', 'border-gray-700', 'text-white'));
+    event.currentTarget.classList.add('bg-gray-800', 'border-gray-700', 'text-white');
+
+    currentTable = tableName;
+    lastKey = null;
+    document.getElementById('active-table-title').innerText = tableName;
+
+    if (!tableSchemas[tableName]) {
+      try {
+        const res = await fetch(`/dashboard/api/dynamo/describe?table=${tableName}`);
+        const data = await res.json();
+
+        const schema = { pk: null, sk: null };
+        data.Table.KeySchema.forEach(key => {
+          if (key.KeyType === 'HASH') schema.pk = key.AttributeName;
+          if (key.KeyType === 'RANGE') schema.sk = key.AttributeName;
+        });
+        tableSchemas[tableName] = schema;
+      } catch (err) {
+        console.error("Failed to describe table schema", err);
+      }
+    }
+
+    await fetchDdbTableData(); // This handles the Scan call
+  }
+
+  async function ddbLoadTables() {
+    try {
+      const res = await fetch('/dashboard/api/dynamo/tables');
+      const data = await res.json();
+      const container = document.getElementById('ddb-table-list');
+
+      if (data !== undefined && data.TableNames !== undefined) {
+
+        container.innerHTML = data.TableNames.map(name => `
+            <button onclick="selectDdbTable('${name}')" class="table-btn w-full text-left p-2 rounded-lg text-sm transition-all hover:bg-gray-800 border border-transparent hover:border-gray-700 text-gray-400 hover:text-white flex justify-between items-center group">
+                ${name}
+                <span class="opacity-0 group-hover:opacity-100 text-[10px] text-orange-500">View →</span>
+            </button>
+        `).join('');
+      }
+    } catch (err) {
+      console.error("Failed to load DynamoDB tables", err);
+    }
+  }
+
+  async function fetchDdbTableData(next = false) {
+    if (!currentTable) return;
+
+    let url = `/dashboard/api/dynamo/scan?table=${currentTable}`;
+    if (next && lastKey) url += `&last_key=${encodeURIComponent(JSON.stringify(lastKey))}`;
+
+    const res = await fetch(url);
+    const result = await res.json();
+
+    lastKey = result.LastEvaluatedKey;
+    renderDdbTableGrid(result.Items.map(item => DynamoDbParser.unmarshall({M: item})));
+  }
+
+  function renderDdbTableGrid(items) {
+    // if (items.length === 0) return;
+
+    // 1. Get all unique keys for headers
+    const keys = [...new Set(items.flatMap(obj => Object.keys(obj)))];
+    const schema = tableSchemas[currentTable] || {};
+
+    // 2. Render Headers
+    document.getElementById('ddb-grid-header').innerHTML = `
+        <tr>
+            ${keys.map(k => {
+              const isKey = (k === schema.pk || k === schema.sk);
+              return `<th class="p-3 text-gray-400 border-b border-gray-700 whitespace-nowrap">
+                        <div class="flex items-center gap-1">
+                          ${isKey ? '<span class="text-orange-500">🔑</span>' : ''}
+                          ${k}
+                        </div>
+                      </th>`; 
+            }).join('')}
+            <th class="p-3 text-gray-400 border-b border-gray-700 text-right">Actions</th>
+        </tr>
+    `;
+
+    // 3. Render Rows
+    document.getElementById('ddb-grid-body').innerHTML = items.map(item => {
+      const itemStr = encodeURIComponent(JSON.stringify(item));
+      return `
+        <tr class="hover:bg-gray-800/30 group transition-colors">
+            ${keys.map(k => `<td class="p-3 text-slate-300 border-b border-gray-800/50 max-w-xs truncate">${item[k] !== undefined ? item[k] : '-'}</td>`).join('')}
+            <td class="p-3 border-b border-gray-800/50 text-right space-x-2 whitespace-nowrap">
+              <button onclick="openDdbItemEditModal('${itemStr}')" class="text-blue-400 hover:text-blue-300 transition-colors inline-block" title="Edit">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                  </svg>
+              </button>
+
+              <button onclick="deleteDdbItem('${itemStr}')" class="text-red-500 hover:text-red-400 transition-colors inline-block" title="Delete">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+              </button>
+            </td>
+        </tr>
+    `}).join('');
+
+  }
+
+  function openDdbItemCreateModal() {
+    document.getElementById('ddb-item-create-modal').classList.remove('hidden');
+    document.getElementById('ddb-item-active-modal-title').innerText = "New Item";
+    document.getElementById('ddb-item-json').value = '{\n  "id": "' + Math.random().toString(36).substr(2, 9) + '"\n}';
+  }
+
+  function closeDdbItemCreateModal() {
+    document.getElementById('ddb-item-create-modal').classList.add('hidden');
+    document.getElementById('ddb-item-modal-error').classList.add('hidden');
+  }
+
+  async function saveDdbItem() {
+    const rawJson = document.getElementById('ddb-item-json').value;
+    const errorEl = document.getElementById('ddb-item-modal-error');
+
+    try {
+      const itemObj = JSON.parse(rawJson);
+      const marshalledItem = {};
+
+      // Use our DynamoParser from previous step
+      for (let key in itemObj) {
+        marshalledItem[key] = DynamoDbParser.marshall(itemObj[key]);
+      }
+
+      const res = await fetch('/dashboard/api/dynamo/put_item', {
+        method: 'POST',
+        body: JSON.stringify({
+          TableName: currentTable,
+          Item: marshalledItem
+        })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      closeDdbItemCreateModal();
+      await fetchDdbTableData(); // Refresh grid
+    } catch (err) {
+      errorEl.innerText = err.message;
+      errorEl.classList.remove('hidden');
+    }
+  }
+
+  async function deleteDdbItem(itemJsonString) {
+    if (!confirm("Delete this item permanently?")) return;
+
+    try {
+      const item = JSON.parse(decodeURIComponent(itemJsonString));
+      const schema = tableSchemas[currentTable];
+
+      if (!schema || !schema.pk) throw new Error("Table schema not loaded");
+
+      const delPayload = {};
+      delPayload[schema.pk] = DynamoDbParser.marshall(item[schema.pk]);
+
+      if (schema.sk && item[schema.sk] !== undefined) {
+        delPayload[schema.sk] = DynamoDbParser.marshall(item[schema.sk]);
+      }
+
+      const res = await fetch('/dashboard/api/dynamo/delete', {
+        method: 'POST',
+        body: JSON.stringify({
+          TableName: currentTable,
+          Key: delPayload
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.Message || "Delete failed");
+      }
+
+      await fetchDdbTableData(); // Refresh the grid
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  function openDdbItemEditModal(itemJsonString) {
+    const item = JSON.parse(decodeURIComponent(itemJsonString));
+    document.getElementById('ddb-item-create-modal').classList.remove('hidden');
+    document.getElementById('ddb-item-active-modal-title').innerText = "Edit Item";
+
+    // Fill the textarea with the current item's standard JSON
+    document.getElementById('ddb-item-json').value = JSON.stringify(item, null, 2);
+  }
+
+  // system overview
+  function showView(viewId) {
+    // Hide all views
+    document.querySelectorAll('.view-container').forEach(el => el.classList.add('hidden'));
+
+    // Show selected view
+    document.getElementById(`view-${viewId}`).classList.remove('hidden');
+
+    if (viewId === 'overview') {
+      fetchData();
+    }
+    // Update UI if switching to DynamoDB
+    if (viewId === 'dynamodb') {
+      ddbLoadTables();
+    }
+  }
+
   async function triggerAction(action, service, target) {
     if (!confirm(`Are you sure you want to ${action.replace('_',' ')} for ${target}?`)) return;
 
@@ -123,7 +438,6 @@
                     <div class="flex items-center justify-between group">
                         <span class="text-sm font-medium ${s.healthy ? 'text-slate-200' : 'text-gray-600'}">${s.name}</span>
                         <div class="flex items-center gap-2">
-<!--                            <span class="text-[10px] text-gray-600 font-mono">:${s.port}</span>-->
                             <div class="w-2 h-2 rounded-full ${s.healthy ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500 status-pulse'}"></div>
                         </div>
                     </div>
@@ -132,7 +446,7 @@
       // 2. Update Storage Grid
       const storageGrid = document.getElementById('storage-grid');
       storageGrid.innerHTML = Object.entries(data.storage).map(([svc, size]) => `
-                    <div class="bg-neutral-900 border border-neutral-800 p-4 rounded-2xl hover:border-neutral-700 transition-colors">
+                    <div class="bg-stone-900 border border-stone-800 p-4 rounded-2xl hover:border-stone-700 transition-colors">
                         <div class="text-xs font-bold text-gray-400 uppercase tracking-tighter">${svc}</div>
                         <div class="text-2xl font-black text-white mt-2">${size}</div>
                     </div>
@@ -140,13 +454,15 @@
 
       document.getElementById('vol-path').innerText = data.volume_path;
 
-      const s3Container = document.getElementById('s3-actions');
-      s3Container.innerHTML = data.buckets.map(b => `
-        <div class="flex items-center justify-between p-2 hover:bg-neutral-800 rounded-lg transition-colors">
+      if (data.buckets !== undefined) {
+        const s3Container = document.getElementById('s3-actions');
+        s3Container.innerHTML = data.buckets.map(b => `
+        <div class="flex items-center justify-between p-2 hover:bg-stone-800 rounded-lg transition-colors">
             <span class="text-sm font-mono">${b}</span>
             <button onclick="triggerAction('clear_s3', 's3', '${b}')" class="text-xs bg-red-900/40 text-red-400 px-3 py-1 rounded-md border border-red-500/30 hover:bg-red-500 hover:text-white transition-all">Clear</button>
         </div>
       `).join('');
+      }
     } catch (err) {
       console.error("Dashboard sync error:", err);
     }
@@ -173,7 +489,7 @@
 
     eventSource.onmessage = function(event) {
       const line = document.createElement('div');
-      // line.className = "border-b border-neutral-900 py-1";
+      // line.className = "border-b border-stone-900 py-1";
       line.className = "pb-1";
       line.textContent = event.data;
       consoleEl.appendChild(line);
@@ -192,7 +508,8 @@
 
   // Poll every 3 seconds
   // setInterval(fetchData, 3000);
-  fetchData();
+  // fetchData();
+  showView('overview');
 </script>
 </body>
 </html>
