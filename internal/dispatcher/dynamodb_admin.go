@@ -1,7 +1,6 @@
 package dispatcher
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,19 +17,8 @@ func (d *Dispatcher) HandleDynamoAdmin(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Scan Table (with Pagination)
 	if r.URL.Path == "/dashboard/api/dynamo/scan" {
-		tableName := r.URL.Query().Get("table")
-		exclusiveStartKey := r.URL.Query().Get("last_key")
-
-		payload := map[string]interface{}{
-			"TableName": tableName,
-			"Limit":     100,
-		}
-		if exclusiveStartKey != "" {
-			payload["ExclusiveStartKey"] = exclusiveStartKey
-		}
-
-		jsonPayload, _ := json.Marshal(payload)
-		d.ProxyToDynamo(w, r, "Scan", jsonPayload)
+		body, _ := io.ReadAll(r.Body)
+		d.ProxyToDynamo(w, r, "Scan", body)
 		return
 	}
 

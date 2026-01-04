@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cloudlocal</title>
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
-  <link type="text/css" rel="stylesheet" href="styles.css">
+  <link rel="icon" href="favicon.ico">
+  <link href="styles.css" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-stone-950 text-slate-200 font-sans">
@@ -107,6 +107,7 @@
         </div>
       </section>
     </div>
+    <!-- DynamoDb Explorer -->
     <div id="view-dynamodb" class="view-container hidden h-full flex flex-row overflow-hidden">
       <div class="w-64 bg-gray-950 border-r border-gray-800 p-6 overflow-y-auto">
         <h3 class="text-xs font-black text-gray-500 uppercase tracking-widest mb-6">Dynamo Tables</h3>
@@ -115,6 +116,7 @@
       </div>
 
       <div class="flex-1 flex flex-col bg-gray-900/20">
+        <!-- DynamoDb table - header controls -->
         <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900/40">
           <div class="flex items-center gap-3">
             <div class="p-2 bg-orange-500/10 rounded-lg">
@@ -154,383 +156,86 @@
           </div>
         </div>
 
-        <div class="flex-1 overflow-auto">
-          <table class="w-full text-left text-xs font-mono">
-            <thead id="ddb-grid-header" class="bg-gray-800 sticky top-0 z-10"></thead>
-            <tbody id="ddb-grid-body" class="divide-y divide-gray-800/50"></tbody>
+        <!-- DynamoDb Filter -->
+        <div class="p-4 border-b border-gray-800 bg-gray-900/20 flex flex-wrap gap-3 items-center justify-between">
+          <div class="flex gap-3 items-center">
+            <div class="flex items-center gap-2 bg-black/40 p-1 rounded-lg border border-gray-800">
+              <label for="ddb-filter-column"></label>
+              <select id="ddb-filter-column" class="bg-transparent text-xs text-gray-300 outline-none p-1 w-32">
+                <option value="">Select Column</option>
+              </select>
+              <label for="ddb-filter-operator"></label>
+              <select id="ddb-filter-operator" class="bg-transparent text-xs text-gray-300 outline-none p-1 border-l border-gray-800">
+                <option value="=">=</option>
+                <option value="contains">contains</option>
+                <option value="BEGINS_WITH">begins with</option>
+              </select>
+              <label for="ddb-filter-value"></label>
+              <input id="ddb-filter-value" type="text" placeholder="Value..." class="bg-transparent text-xs text-orange-200 outline-none p-1 border-l border-gray-800 w-40">
+            </div>
+            <button onclick="applyDdbFilter()" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition-all">Apply</button>
+            <button onclick="clearDdbFilter()" class="text-gray-500 hover:text-gray-300 text-xs">Clear</button>
+
+          </div>
+
+          <!-- DynamoDb Refresh -->
+          <div class="flex items-center gap-2">
+            <label class="flex items-center gap-2 cursor-pointer group mr-2">
+              <span class="text-[10px] font-bold text-gray-500 uppercase tracking-tighter group-hover:text-gray-300">Live</span>
+              <input type="checkbox" id="ddb-auto-refresh-check" onchange="toggleDdbAutoRefresh()" class="sr-only peer">
+              <div class="w-8 h-4 bg-gray-800 rounded-full peer peer-checked:bg-orange-600 relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+            </label>
+
+            <button id="ddb-refresh-btn" onclick="fetchDdbTableData()" class="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-all" title="Refresh">
+              <svg id="ddb-refresh-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-4 border-b border-gray-800 bg-gray-900/20 flex flex-wrap gap-3 items-center">
+        </div>
+
+        <!-- DynamoDb selected table data grid -->
+        <div class="flex-1 overflow-auto ddb-custom-scrollbar">
+          <table class="w-full min-w-max text-left text-xs font-mono border-separate border-spacing-0">
+            <thead id="ddb-grid-header" class="bg-gray-800 sticky top-0 z-10 shadow-sm"></thead>
+            <tbody id="ddb-grid-body" class="divide-y divide-gray-800/50 bg-gray-900/10"></tbody>
           </table>
+        </div>
+        <!-- Cell modal -->
+        <div id="ddb-cell-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-lg shadow-2xl">
+            <div class="p-4 border-b border-gray-800 flex justify-between items-center">
+              <h3 id="ddb-cell-modal-title" class="text-sm font-bold text-gray-400 uppercase tracking-widest">Field Detail</h3>
+              <button onclick="closeDdbCellModal()" class="text-gray-500 hover:text-white text-xl">&times;</button>
+            </div>
+            <div class="p-6">
+              <pre id="ddb-cell-modal-content" class="w-full max-h-96 overflow-auto bg-black/50 border border-gray-800 rounded-lg p-4 text-xs font-mono text-orange-200 whitespace-pre-wrap break-all"></pre>
+            </div>
+            <div class="p-4 border-t border-gray-800 flex justify-end gap-3 bg-gray-950/50 rounded-b-xl">
+              <button onclick="copyDdbCellContent()" class="px-4 py-2 text-[10px] font-bold bg-gray-800 text-gray-300 hover:text-white rounded-md transition-all">Copy Content</button>
+              <button onclick="closeDdbCellModal()" class="px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-white">Close</button>
+            </div>
+          </div>
+        </div>
+        <!-- DynamoDb table - footer -->
+        <div class="p-3 border-t border-gray-800 bg-gray-900/50 flex justify-between items-center">
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 px-2 py-1 bg-gray-800 rounded-md border border-gray-700">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span id="ddb-row-count" class="text-[11px] font-mono text-gray-300">0 Items</span>
+            </div>
+            <span class="text-[10px] text-gray-500 italic">Scan limited to 50 rows per page</span>
+          </div>
+
+          <div id="ddb-pagination-controls" class="flex gap-2"></div>
         </div>
       </div>
     </div>
   </main>
 </div>
-
-<script>
-
-  // Dynamodb
-  const DynamoDbParser = {
-    // Convert DynamoDB JSON -> Standard JSON
-    unmarshall: function(data) {
-      if (!data || typeof data !== 'object') return data;
-      if (data.S !== undefined) return data.S;
-      if (data.N !== undefined) return Number(data.N);
-      if (data.BOOL !== undefined) return data.BOOL;
-      if (data.NULL !== undefined) return null;
-      if (data.M) {
-        let obj = {};
-        for (let k in data.M) obj[k] = this.unmarshall(data.M[k]);
-        return obj;
-      }
-      if (data.L) return data.L.map(v => this.unmarshall(v));
-      return data;
-    },
-
-    // Convert Standard JSON -> DynamoDB JSON (for Create/Update)
-    marshall: function(data) {
-      if (typeof data === 'string') return { S: data };
-      if (typeof data === 'number') return { N: data.toString() };
-      if (typeof data === 'boolean') return { BOOL: data };
-      if (data === null) return { NULL: true };
-      if (Array.isArray(data)) return { L: data.map(v => this.marshall(v)) };
-      if (typeof data === 'object') {
-        let m = {};
-        for (let k in data) m[k] = this.marshall(data[k]);
-        return { M: m };
-      }
-      return { S: String(data) };
-    }
-  };
-
-  let currentTable = null;
-  let lastKey = null;
-  let tableSchemas = {}; // Cache for { tableName: { pk: 'id', sk: 'timestamp' } }
-
-  async function selectDdbTable(tableName) {
-    // Highlight the selected button
-    document.querySelectorAll('.table-btn').forEach(b => b.classList.remove('bg-gray-800', 'border-gray-700', 'text-white'));
-    event.currentTarget.classList.add('bg-gray-800', 'border-gray-700', 'text-white');
-
-    currentTable = tableName;
-    lastKey = null;
-    document.getElementById('active-table-title').innerText = tableName;
-
-    if (!tableSchemas[tableName]) {
-      try {
-        const res = await fetch(`/dashboard/api/dynamo/describe?table=${tableName}`);
-        const data = await res.json();
-
-        const schema = { pk: null, sk: null };
-        data.Table.KeySchema.forEach(key => {
-          if (key.KeyType === 'HASH') schema.pk = key.AttributeName;
-          if (key.KeyType === 'RANGE') schema.sk = key.AttributeName;
-        });
-        tableSchemas[tableName] = schema;
-      } catch (err) {
-        console.error("Failed to describe table schema", err);
-      }
-    }
-
-    await fetchDdbTableData(); // This handles the Scan call
-  }
-
-  async function ddbLoadTables() {
-    try {
-      const res = await fetch('/dashboard/api/dynamo/tables');
-      const data = await res.json();
-      const container = document.getElementById('ddb-table-list');
-
-      if (data !== undefined && data.TableNames !== undefined) {
-
-        container.innerHTML = data.TableNames.map(name => `
-            <button onclick="selectDdbTable('${name}')" class="table-btn w-full text-left p-2 rounded-lg text-sm transition-all hover:bg-gray-800 border border-transparent hover:border-gray-700 text-gray-400 hover:text-white flex justify-between items-center group">
-                ${name}
-                <span class="opacity-0 group-hover:opacity-100 text-[10px] text-orange-500">View →</span>
-            </button>
-        `).join('');
-      }
-    } catch (err) {
-      console.error("Failed to load DynamoDB tables", err);
-    }
-  }
-
-  async function fetchDdbTableData(next = false) {
-    if (!currentTable) return;
-
-    let url = `/dashboard/api/dynamo/scan?table=${currentTable}`;
-    if (next && lastKey) url += `&last_key=${encodeURIComponent(JSON.stringify(lastKey))}`;
-
-    const res = await fetch(url);
-    const result = await res.json();
-
-    lastKey = result.LastEvaluatedKey;
-    renderDdbTableGrid(result.Items.map(item => DynamoDbParser.unmarshall({M: item})));
-  }
-
-  function renderDdbTableGrid(items) {
-    // if (items.length === 0) return;
-
-    // 1. Get all unique keys for headers
-    const keys = [...new Set(items.flatMap(obj => Object.keys(obj)))];
-    const schema = tableSchemas[currentTable] || {};
-
-    // 2. Render Headers
-    document.getElementById('ddb-grid-header').innerHTML = `
-        <tr>
-            ${keys.map(k => {
-              const isKey = (k === schema.pk || k === schema.sk);
-              return `<th class="p-3 text-gray-400 border-b border-gray-700 whitespace-nowrap">
-                        <div class="flex items-center gap-1">
-                          ${isKey ? '<span class="text-orange-500">🔑</span>' : ''}
-                          ${k}
-                        </div>
-                      </th>`;
-            }).join('')}
-            <th class="p-3 text-gray-400 border-b border-gray-700 text-right">Actions</th>
-        </tr>
-    `;
-
-    // 3. Render Rows
-    document.getElementById('ddb-grid-body').innerHTML = items.map(item => {
-      const itemStr = encodeURIComponent(JSON.stringify(item));
-      return `
-        <tr class="hover:bg-gray-800/30 group transition-colors">
-            ${keys.map(k => `<td class="p-3 text-slate-300 border-b border-gray-800/50 max-w-xs truncate">${item[k] !== undefined ? item[k] : '-'}</td>`).join('')}
-            <td class="p-3 border-b border-gray-800/50 text-right space-x-2 whitespace-nowrap">
-              <button onclick="duplicateDdbItem('${itemStr}')" class="text-emerald-400 hover:text-emerald-300 transition-colors inline-block" title="Duplicate">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path>
-                </svg>
-              </button>
-
-              <button onclick="openDdbItemEditModal('${itemStr}')" class="text-blue-400 hover:text-blue-300 transition-colors inline-block" title="Edit">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                </svg>
-              </button>
-
-              <button onclick="deleteDdbItem('${itemStr}')" class="text-red-500 hover:text-red-400 transition-colors inline-block" title="Delete">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                </svg>
-              </button>
-            </td>
-        </tr>
-    `}).join('');
-
-  }
-
-  function openDdbItemCreateModal() {
-    document.getElementById('ddb-item-create-modal').classList.remove('hidden');
-    document.getElementById('ddb-item-active-modal-title').innerText = "New Item";
-    document.getElementById('ddb-item-json').value = '{\n  "id": "' + Math.random().toString(36).substr(2, 9) + '"\n}';
-  }
-
-  function closeDdbItemCreateModal() {
-    document.getElementById('ddb-item-create-modal').classList.add('hidden');
-    document.getElementById('ddb-item-modal-error').classList.add('hidden');
-  }
-
-  async function saveDdbItem() {
-    const rawJson = document.getElementById('ddb-item-json').value;
-    const errorEl = document.getElementById('ddb-item-modal-error');
-
-    try {
-      const itemObj = JSON.parse(rawJson);
-      const marshalledItem = {};
-
-      // Use our DynamoParser from previous step
-      for (let key in itemObj) {
-        marshalledItem[key] = DynamoDbParser.marshall(itemObj[key]);
-      }
-
-      const res = await fetch('/dashboard/api/dynamo/put_item', {
-        method: 'POST',
-        body: JSON.stringify({
-          TableName: currentTable,
-          Item: marshalledItem
-        })
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-
-      closeDdbItemCreateModal();
-      await fetchDdbTableData(); // Refresh grid
-    } catch (err) {
-      errorEl.innerText = err.message;
-      errorEl.classList.remove('hidden');
-    }
-  }
-
-  async function deleteDdbItem(itemJsonString) {
-    if (!confirm("Delete this item permanently?")) return;
-
-    try {
-      const item = JSON.parse(decodeURIComponent(itemJsonString));
-      const schema = tableSchemas[currentTable];
-
-      if (!schema || !schema.pk) throw new Error("Table schema not loaded");
-
-      const delPayload = {};
-      delPayload[schema.pk] = DynamoDbParser.marshall(item[schema.pk]);
-
-      if (schema.sk && item[schema.sk] !== undefined) {
-        delPayload[schema.sk] = DynamoDbParser.marshall(item[schema.sk]);
-      }
-
-      const res = await fetch('/dashboard/api/dynamo/delete', {
-        method: 'POST',
-        body: JSON.stringify({
-          TableName: currentTable,
-          Key: delPayload
-        })
-      });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.Message || "Delete failed");
-      }
-
-      await fetchDdbTableData(); // Refresh the grid
-    } catch (err) {
-      alert(err.message);
-    }
-  }
-
-  function openDdbItemEditModal(itemJsonString) {
-    const item = JSON.parse(decodeURIComponent(itemJsonString));
-    document.getElementById('ddb-item-create-modal').classList.remove('hidden');
-    document.getElementById('ddb-item-active-modal-title').innerText = "Edit Item";
-
-    // Fill the textarea with the current item's standard JSON
-    document.getElementById('ddb-item-json').value = JSON.stringify(item, null, 2);
-  }
-
-  function duplicateDdbItem(itemJsonString) {
-    const item = JSON.parse(decodeURIComponent(itemJsonString));
-
-    // Open the same modal we use for Create/Edit
-    document.getElementById('ddb-item-create-modal').classList.remove('hidden');
-    document.getElementById('ddb-item-active-modal-title').innerText = "Duplicate Item";
-
-    // Fill the textarea with the current item's JSON
-    // The user will need to change the ID/Partition Key before clicking Save
-    document.getElementById('ddb-item-json').value = JSON.stringify(item, null, 2);
-
-    // Focus the textarea so they can start editing immediately
-    document.getElementById('ddb-item-json').focus();
-  }
-
-  // system overview
-  function showView(viewId) {
-    // Hide all views
-    document.querySelectorAll('.view-container').forEach(el => el.classList.add('hidden'));
-
-    // Show selected view
-    document.getElementById(`view-${viewId}`).classList.remove('hidden');
-
-    if (viewId === 'overview') {
-      fetchData();
-    }
-    // Update UI if switching to DynamoDB
-    if (viewId === 'dynamodb') {
-      ddbLoadTables();
-    }
-  }
-
-  async function triggerAction(action, service, target) {
-    if (!confirm(`Are you sure you want to ${action.replace('_',' ')} for ${target}?`)) return;
-
-    await fetch('/dashboard/api/action', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ action, service, target })
-    });
-    await fetchData(); // Refresh UI
-  }
-
-  async function fetchData() {
-    try {
-      const res = await fetch('/dashboard/api/status');
-      const data = await res.json();
-
-      // 1. Update Sidebar Status
-      const serviceList = document.getElementById('service-list');
-      serviceList.innerHTML = data.services.map(s => `
-                    <div class="flex items-center justify-between group">
-                        <span class="text-sm font-medium ${s.healthy ? 'text-slate-200' : 'text-gray-600'}">${s.name}</span>
-                        <div class="flex items-center gap-2">
-                            <div class="w-2 h-2 rounded-full ${s.healthy ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500 status-pulse'}"></div>
-                        </div>
-                    </div>
-                `).join('');
-
-      // 2. Update Storage Grid
-      const storageGrid = document.getElementById('storage-grid');
-      storageGrid.innerHTML = Object.entries(data.storage).map(([svc, size]) => `
-                    <div class="bg-stone-900 border border-stone-800 p-4 rounded-2xl hover:border-stone-700 transition-colors">
-                        <div class="text-xs font-bold text-gray-400 uppercase tracking-tighter">${svc}</div>
-                        <div class="text-2xl font-black text-white mt-2">${size}</div>
-                    </div>
-                `).join('');
-
-      document.getElementById('vol-path').innerText = data.volume_path;
-
-      if (data.buckets !== undefined) {
-        const s3Container = document.getElementById('s3-actions');
-        s3Container.innerHTML = data.buckets.map(b => `
-        <div class="flex items-center justify-between p-2 hover:bg-stone-800 rounded-lg transition-colors">
-            <span class="text-sm font-mono">${b}</span>
-            <button onclick="triggerAction('clear_s3', 's3', '${b}')" class="text-xs bg-red-900/40 text-red-400 px-3 py-1 rounded-md border border-red-500/30 hover:bg-red-500 hover:text-white transition-all">Clear</button>
-        </div>
-      `).join('');
-      }
-    } catch (err) {
-      console.error("Dashboard sync error:", err);
-    }
-  }
-
-  function downloadLogs() {
-    const service = document.getElementById('log-selector').value;
-    // Simply navigate the window to the download URL
-    window.location.href = `/dashboard/api/logs/download?service=${service}`;
-  }
-
-  let eventSource = null;
-
-  function switchLog() {
-    const service = document.getElementById('log-selector').value;
-    const consoleEl = document.getElementById('log-console');
-
-    // Close existing stream
-    if (eventSource) eventSource.close();
-    consoleEl.innerHTML = `<div class="text-blue-400 font-bold pb-1">[SYSTEM] Switched to ${service} logs...</div>`;
-
-    // Start new SSE connection
-    eventSource = new EventSource(`/dashboard/api/logs?service=${service}`);
-
-    eventSource.onmessage = function(event) {
-      const line = document.createElement('div');
-      // line.className = "border-b border-stone-900 py-1";
-      line.className = "pb-1";
-      line.textContent = event.data;
-      consoleEl.appendChild(line);
-
-      // Auto-scroll to bottom
-      consoleEl.scrollTop = consoleEl.scrollHeight;
-    };
-
-    eventSource.onerror = function() {
-      console.error("Log stream lost. Reconnecting...");
-    };
-  }
-
-  // Initialize with Edge logs
-  switchLog();
-
-  // Poll every 3 seconds
-  // setInterval(fetchData, 3000);
-  // fetchData();
-  showView('overview');
-</script>
+<script src="main.js"></script>
 </body>
 </html>
