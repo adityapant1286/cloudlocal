@@ -58,6 +58,11 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			if strings.HasPrefix(r.URL.Path, "/dashboard/api/s3") {
+				d.HandleS3Admin(w, r)
+				return
+			}
+
 			return
 		}
 

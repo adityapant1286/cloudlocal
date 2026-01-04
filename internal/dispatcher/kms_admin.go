@@ -34,8 +34,7 @@ func (d *Dispatcher) HandleKMSAdmin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Dispatcher) ProxyToKMS(w http.ResponseWriter, r *http.Request, action string, payload []byte) {
-	url := "http://localhost:10050"
-	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
+	req, _ := http.NewRequest("POST", utils.CloudLocalUrl, bytes.NewBuffer(payload))
 
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
 	req.Header.Set("X-Amz-Target", "TrentService."+action) // KMS uses "TrentService"

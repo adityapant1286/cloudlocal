@@ -215,7 +215,7 @@ function renderDdbTableGrid(items) {
               const safeVal = encodeURIComponent(JSON.stringify(val));
               return `
                 <td class="p-3 text-slate-300 border-b border-gray-800/50 whitespace-nowrap overflow-hidden text-ellipsis max-w-[250px]">
-                  <div onclick="openDdbCellModal('${k}', JSON.parse(decodeURIComponent('${safeVal}')))" 
+                  <div onclick="openCellModal('${k}', JSON.parse(decodeURIComponent('${safeVal}')))" 
                        class="cursor-pointer hover:text-orange-400 transition-colors"
                        title="Click to expand">
                       ${displayVal}
@@ -244,37 +244,6 @@ function renderDdbTableGrid(items) {
         </tr>
     `}).join('');
 
-}
-
-function openDdbCellModal(columnName, value) {
-  const modal = document.getElementById('ddb-cell-modal');
-  const title = document.getElementById('ddb-cell-modal-title');
-  const content = document.getElementById('ddb-cell-modal-content');
-
-  title.innerText = `Field: ${columnName}`;
-
-  // Attempt to pretty-print if it looks like JSON/Object
-  if (typeof value === 'object' && value !== null) {
-    content.innerText = JSON.stringify(value, null, 2);
-  } else {
-    content.innerText = value;
-  }
-
-  modal.classList.remove('hidden');
-}
-
-function closeDdbCellModal() {
-  document.getElementById('ddb-cell-modal').classList.add('hidden');
-}
-
-function copyDdbCellContent() {
-  const content = document.getElementById('ddb-cell-modal-content').innerText;
-  navigator.clipboard.writeText(content);
-
-  const btn = event.target;
-  const originalText = btn.innerText;
-  btn.innerText = "Copied!";
-  setTimeout(() => btn.innerText = originalText, 2000);
 }
 
 function openDdbItemCreateModal() {
@@ -761,6 +730,135 @@ async function sqsDeleteMessage(encodedHandle) {
   }
 }
 
+// S3 Manager
+let s3CurrentBucket = "";
+
+async function s3LoadBuckets() {
+  const res = await fetch('/dashboard/api/s3/list-buckets');
+  const data = await res.json();
+  const container = document.getElementById('s3-bucket-list');
+
+  container.innerHTML = data.Buckets.map(b => `
+        <button onclick="s3SelectBucket('${b.Name}')" class="w-full text-left px-4 py-3 rounded-lg text-sm transition-all hover:bg-gray-800 group border border-transparent hover:border-gray-700">
+            <div class="text-slate-300 font-medium flex items-center gap-2">
+                <svg class="w-3 h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+                ${b.Name}
+            </div>
+        </button>
+    `).join('');
+}
+
+async function s3SelectBucket(name) {
+  s3CurrentBucket = name;
+  document.getElementById('s3-active-bucket-name').innerText = name;
+  document.getElementById('s3-workspace').classList.remove('hidden');
+
+  const res = await fetch(`/dashboard/api/s3/list-objects?bucket=${name}`);
+  const data = await res.json();
+  const container = document.getElementById('s3-object-list');
+
+  if (!data.Contents) {
+    container.innerHTML = '<tr><td colspan="3" class="p-10 text-center text-gray-600">No objects found</td></tr>';
+    return;
+  }
+
+  container.innerHTML = data.Contents.map(obj => {
+    const safeKey = encodeURIComponent(obj.Key);
+    return `
+        <tr class="hover:bg-gray-800/30 group border-b border-gray-800/50 transition-colors">
+        <td class="p-3">
+            <button onclick="s3ViewObject('${safeKey}')" 
+                    class="text-blue-400 hover:text-blue-300 hover:underline text-left transition-colors">
+                ${obj.Key}
+            </button>
+        </td>
+        <td class="p-3 text-gray-500 font-mono">${(obj.Size / 1024).toFixed(2)} KB</td>
+        <td class="p-3 text-right">
+            <button onclick="s3DeleteObject('${safeKey}')" 
+                    class="text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </button>
+        </td>
+    </tr>
+    `;
+  }).join('');
+}
+
+function s3OpenUploadModal() {
+  document.getElementById('s3-upload-bucket-name').innerText = s3CurrentBucket;
+  document.getElementById('s3-upload-modal').classList.remove('hidden');
+  document.getElementById('s3-upload-key').value = "";
+  document.getElementById('s3-upload-content').value = "";
+}
+
+function s3CloseUploadModal() {
+  document.getElementById('s3-upload-modal').classList.add('hidden');
+}
+
+async function s3PerformUpload() {
+  const key = document.getElementById('s3-upload-key').value;
+  const content = document.getElementById('s3-upload-content').value;
+
+  if (!key) {
+    return alert("Object key is required");
+  }
+
+  try {
+    const res = await fetch('/dashboard/api/s3/upload', {
+      method: 'POST',
+      body: JSON.stringify({
+        Bucket: s3CurrentBucket,
+        Key: key,
+        Body: btoa(content) // Encode to base64 for safe transit
+      })
+    });
+
+    if (!res.ok) {
+      throw new Error("Upload failed");
+    }
+
+    s3CloseUploadModal();
+
+    await s3SelectBucket(s3CurrentBucket); // Refresh the list
+
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function s3DeleteObject(key) {
+  if (!confirm(`Delete ${key} from ${s3CurrentBucket}?`)) return;
+
+  try {
+    const res = await fetch(`/dashboard/api/s3/delete?bucket=${s3CurrentBucket}&key=${encodeURIComponent(key)}`, {
+      method: 'POST'
+    });
+
+    if (!res.ok) {
+      throw new Error("Delete failed");
+    }
+
+    await s3SelectBucket(s3CurrentBucket); // Refresh the list
+
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function s3ViewObject(key) {
+  // In a real AWS environment, you'd use a Presigned URL.
+  // Locally, we can just fetch the object data.
+  const res = await fetch(`/dashboard/api/s3/get-object?bucket=${s3CurrentBucket}&key=${encodeURIComponent(key)}`);
+  const data = await res.json();
+
+  // Decode from base64 (AWS returns Body as base64 in many JSON proxies)
+  const content = atob(data.Body);
+
+  openCellModal(`S3: ${key}`, content);
+}
+
 // system overview
 let eventSource = null;
 
@@ -774,30 +872,27 @@ async function showView(viewId) {
   }
 
   document.getElementById(`view-${viewId}`).classList.remove('hidden');
-  if (viewId === 'overview') {
-    await fetchOverviewData();
-    return
-  }
-  // Update UI if switching to DynamoDB
-  if (viewId === 'dynamodb') {
-    await ddbLoadTables();
-    return
-  }
 
-  if (viewId === 'secrets') {
-    await loadSecrets();
-    return
+  switch (viewId) {
+    case "overview":
+      await fetchOverviewData();
+      return
+    case 'dynamodb':
+      await ddbLoadTables();
+      return;
+    case 'secrets':
+      await loadSecrets();
+      return;
+    case 'kms':
+      await loadKmsKeys();
+      return;
+    case 'sqs':
+      await sqsLoadQueues();
+      return;
+    case 's3':
+      await s3LoadBuckets();
+      return;
   }
-
-  if (viewId === 'kms') {
-    await loadKmsKeys();
-    return
-  }
-
-  if (viewId === 'sqs') {
-    await sqsLoadQueues();
-  }
-
 }
 
 /*
@@ -859,6 +954,37 @@ async function fetchOverviewData() {
     console.error("Dashboard sync error:", err);
   }
 
+}
+
+function openCellModal(columnName, value) {
+  const modal = document.getElementById('cell-modal');
+  const title = document.getElementById('cell-modal-title');
+  const content = document.getElementById('cell-modal-content');
+
+  title.innerText = `Field: ${columnName}`;
+
+  // Attempt to pretty-print if it looks like JSON/Object
+  if (typeof value === 'object' && value !== null) {
+    content.innerText = JSON.stringify(value, null, 2);
+  } else {
+    content.innerText = value;
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeCellModal() {
+  document.getElementById('cell-modal').classList.add('hidden');
+}
+
+function copyCellContent() {
+  const content = document.getElementById('cell-modal-content').innerText;
+  navigator.clipboard.writeText(content);
+
+  const btn = event.target;
+  const originalText = btn.innerText;
+  btn.innerText = "Copied!";
+  setTimeout(() => btn.innerText = originalText, 2000);
 }
 
 function downloadLogs() {

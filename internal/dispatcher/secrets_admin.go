@@ -43,8 +43,7 @@ func (d *Dispatcher) HandleSecretsAdmin(w http.ResponseWriter, r *http.Request) 
 
 // ProxyToSecrets is identical to ProxyToDynamo but with a different Target header
 func (d *Dispatcher) ProxyToSecrets(w http.ResponseWriter, r *http.Request, action string, payload []byte) {
-	url := "http://localhost:10050" // Same port for LocalStack
-	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
+	req, _ := http.NewRequest("POST", utils.CloudLocalUrl, bytes.NewBuffer(payload))
 
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
 	req.Header.Set("X-Amz-Target", "secretsmanager."+action)

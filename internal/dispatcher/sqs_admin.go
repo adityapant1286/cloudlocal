@@ -45,8 +45,7 @@ func (d *Dispatcher) HandleSQSAdmin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Dispatcher) ProxyToSQS(w http.ResponseWriter, r *http.Request, action string, payload []byte) {
-	url := "http://localhost:10050" // CloudLocal/LocalStack port
-	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
+	req, _ := http.NewRequest("POST", utils.CloudLocalUrl, bytes.NewBuffer(payload))
 
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
 	req.Header.Set("X-Amz-Target", "AmazonSQS."+action)
