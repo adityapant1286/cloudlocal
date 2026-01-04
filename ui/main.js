@@ -552,6 +552,75 @@ async function deleteSecret() {
   }
 }
 
+// KMS manager
+let currentKmsKey = null;
+
+async function loadKmsKeys() {
+  const res = await fetch('/dashboard/api/kms/list');
+  const data = await res.json();
+  const container = document.getElementById('kms-key-list');
+
+  if (data && data.Keys) {
+    container.innerHTML = data.Keys.map(k => `
+        <button onclick="selectKmsKey('${k.KeyId}')" class="w-full text-left px-4 py-3 rounded-lg text-sm transition-all hover:bg-gray-800 group border border-transparent hover:border-gray-700">
+            <div class="text-slate-300 font-mono text-[11px] truncate">${k.KeyId}</div>
+        </button>
+    `).join('');
+  }
+}
+
+function selectKmsKey(id) {
+  currentKmsKey = id;
+  document.getElementById('kms-workspace').classList.remove('hidden');
+  document.getElementById('kms-active-key-id').innerText = id;
+}
+
+async function kmsEncrypt() {
+  const text = document.getElementById('kms-encrypt-input').value;
+  const res = await fetch('/dashboard/api/kms/encrypt', {
+    method: 'POST',
+    body: JSON.stringify({
+      KeyId: currentKmsKey,
+      Plaintext: btoa(text) // AWS KMS expects base64 plaintext
+    })
+  });
+  const data = await res.json();
+  document.getElementById('kms-encrypt-output').innerText = data.CiphertextBlob;
+}
+
+async function kmsDecrypt() {
+  const blob = document.getElementById('kms-decrypt-input').value;
+  const res = await fetch('/dashboard/api/kms/decrypt', {
+    method: 'POST',
+    body: JSON.stringify({ CiphertextBlob: blob })
+  });
+  const data = await res.json();
+  // Decode base64 result back to text
+  document.getElementById('kms-decrypt-output').innerText = atob(data.Plaintext);
+}
+
+async function createKmsKey() {
+  await fetch('/dashboard/api/kms/create', { method: 'POST' });
+  await loadKmsKeys();
+}
+
+function copyKmsResult(elementId) {
+  const text = document.getElementById(elementId).innerText;
+  if (!text) return;
+
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.currentTarget;
+    const originalHtml = btn.innerHTML;
+
+    // Change to a "Checkmark" icon temporarily
+    btn.innerHTML = `<svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>`;
+
+    setTimeout(() => {
+      btn.innerHTML = originalHtml;
+    }, 2000);
+  });
+}
+
 // system overview
 let eventSource = null;
 
@@ -575,6 +644,10 @@ async function showView(viewId) {
 
   if (viewId === 'secrets') {
     await loadSecrets();
+  }
+
+  if (viewId === 'kms') {
+    await loadKmsKeys();
   }
 
 }

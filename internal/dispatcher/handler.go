@@ -40,10 +40,17 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			if strings.HasPrefix(r.URL.Path, "/dashboard/api/dynamo") {
 				d.HandleDynamoAdmin(w, r)
+				return
 			}
 
 			if strings.HasPrefix(r.URL.Path, "/dashboard/api/secrets") {
 				d.HandleSecretsAdmin(w, r)
+				return
+			}
+
+			if strings.HasPrefix(r.URL.Path, "/dashboard/api/kms") {
+				d.HandleKMSAdmin(w, r)
+				return
 			}
 
 			return
