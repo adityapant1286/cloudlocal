@@ -283,7 +283,7 @@
                           ${isKey ? '<span class="text-orange-500">🔑</span>' : ''}
                           ${k}
                         </div>
-                      </th>`; 
+                      </th>`;
             }).join('')}
             <th class="p-3 text-gray-400 border-b border-gray-700 text-right">Actions</th>
         </tr>
@@ -296,16 +296,22 @@
         <tr class="hover:bg-gray-800/30 group transition-colors">
             ${keys.map(k => `<td class="p-3 text-slate-300 border-b border-gray-800/50 max-w-xs truncate">${item[k] !== undefined ? item[k] : '-'}</td>`).join('')}
             <td class="p-3 border-b border-gray-800/50 text-right space-x-2 whitespace-nowrap">
+              <button onclick="duplicateDdbItem('${itemStr}')" class="text-emerald-400 hover:text-emerald-300 transition-colors inline-block" title="Duplicate">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path>
+                </svg>
+              </button>
+
               <button onclick="openDdbItemEditModal('${itemStr}')" class="text-blue-400 hover:text-blue-300 transition-colors inline-block" title="Edit">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                  </svg>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
               </button>
 
               <button onclick="deleteDdbItem('${itemStr}')" class="text-red-500 hover:text-red-400 transition-colors inline-block" title="Delete">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                  </svg>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
               </button>
             </td>
         </tr>
@@ -397,6 +403,21 @@
 
     // Fill the textarea with the current item's standard JSON
     document.getElementById('ddb-item-json').value = JSON.stringify(item, null, 2);
+  }
+
+  function duplicateDdbItem(itemJsonString) {
+    const item = JSON.parse(decodeURIComponent(itemJsonString));
+
+    // Open the same modal we use for Create/Edit
+    document.getElementById('ddb-item-create-modal').classList.remove('hidden');
+    document.getElementById('ddb-item-active-modal-title').innerText = "Duplicate Item";
+
+    // Fill the textarea with the current item's JSON
+    // The user will need to change the ID/Partition Key before clicking Save
+    document.getElementById('ddb-item-json').value = JSON.stringify(item, null, 2);
+
+    // Focus the textarea so they can start editing immediately
+    document.getElementById('ddb-item-json').focus();
   }
 
   // system overview
