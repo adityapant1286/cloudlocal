@@ -1,45 +1,70 @@
 package dispatcher
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
 )
 
 func (d *Dispatcher) HandleDynamoAdmin(w http.ResponseWriter, r *http.Request) {
+	action := ""
+	var payload []byte
 
-	// 1. List Tables
-	if r.URL.Path == "/dashboard/api/dynamo/tables" {
-		// DynamoDB ListTables call
-		d.ProxyToDynamo(w, r, "ListTables", []byte("{}"))
-		return
-	}
-
-	// 2. Scan Table (with Pagination)
-	if r.URL.Path == "/dashboard/api/dynamo/scan" {
+	switch r.URL.Path {
+	case "/dashboard/api/dynamo/tables":
+		action = "ListTables"
+		payload = []byte("{}")
+	case "/dashboard/api/dynamo/scan":
+		action = "Scan"
 		body, _ := io.ReadAll(r.Body)
-		d.ProxyToDynamo(w, r, "Scan", body)
-		return
-	}
-
-	if r.URL.Path == "/dashboard/api/dynamo/describe" {
+		payload = body
+	case "/dashboard/api/dynamo/describe":
+		action = "DescribeTable"
 		tableName := r.URL.Query().Get("table")
-		payload := []byte(fmt.Sprintf(`{"TableName": "%s"}`, tableName))
-		d.ProxyToDynamo(w, r, "DescribeTable", payload)
-		return
+		payload = []byte(fmt.Sprintf(`{"TableName": "%s"}`, tableName))
+	case "/dashboard/api/dynamo/put_item":
+		action = "PutItem"
+		body, _ := io.ReadAll(r.Body)
+		payload = body
+	case "/dashboard/api/dynamo/delete":
+		action = "DeleteItem"
+		body, _ := io.ReadAll(r.Body)
+		payload = body
 	}
 
-	if r.URL.Path == "/dashboard/api/dynamo/put_item" {
-		body, _ := io.ReadAll(r.Body)
-		// We proxy directly to DynamoDB Local's PutItem action
-		d.ProxyToDynamo(w, r, "PutItem", body)
+	if action != "" {
+		d.ProxyToDynamo(w, r, action, payload)
+	}
+}
+
+// ProxyToDynamo forwards dashboard requests to the local DynamoDB process
+func (d *Dispatcher) ProxyToDynamo(w http.ResponseWriter, r *http.Request, action string, payload []byte) {
+	// DynamoDB Local is on 10051
+	url := "http://localhost:10051"
+
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
+
+	// Crucial: DynamoDB Local requires these specific headers
+	req.Header.Set("Content-Type", "application/x-amz-json-1.0")
+	req.Header.Set("X-Amz-Target", "DynamoDB_20120810."+action)
+	req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential=cloudlocal/20250101/ap-southeast-2/dynamodb/aws4_request, SignedHeaders=host;x-amz-date;x-amz-target, Signature=dummy")
+	req.Header.Set("x-amz-date", "20250101T000000Z")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, "DynamoDB Proxy Error: "+err.Error(), 500)
 		return
 	}
+	defer resp.Body.Close()
 
-	if r.URL.Path == "/dashboard/api/dynamo/delete" {
-		body, _ := io.ReadAll(r.Body)
-		// We proxy directly to DynamoDB Local's PutItem action
-		d.ProxyToDynamo(w, r, "DeleteItem", body)
+	// Forward the DynamoDB response back to the Dashboard
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	_, err = io.Copy(w, resp.Body)
+	if err != nil {
+		http.Error(w, "DynamoDB Proxy Copy Error: "+err.Error(), 500)
 		return
 	}
 }

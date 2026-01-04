@@ -42,6 +42,10 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				d.HandleDynamoAdmin(w, r)
 			}
 
+			if strings.HasPrefix(r.URL.Path, "/dashboard/api/secrets") {
+				d.HandleSecretsAdmin(w, r)
+			}
+
 			return
 		}
 

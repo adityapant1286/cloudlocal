@@ -37,14 +37,26 @@
       <h2 class="text-xs uppercase tracking-widest text-gray-500 font-bold mb-4">Menu</h2>
 
       <button onclick="showView('overview')" class="nav-link w-full flex items-center gap-3 p-2 rounded-lg text-sm font-medium transition-all hover:bg-gray-800 text-slate-300">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" stroke-width="2"/></svg>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" stroke-width="2"/>
+        </svg>
         System Overview
       </button>
 
       <button onclick="showView('dynamodb')" class="nav-link w-full flex items-center gap-3 p-2 rounded-lg text-sm font-medium transition-all hover:bg-gray-800 text-slate-300">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4" stroke-width="2"/></svg>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4" stroke-width="2"/>
+        </svg>
         DynamoDB View
       </button>
+
+      <button onclick="showView('secrets')" class="nav-link w-full flex items-center gap-3 p-2 rounded-lg text-sm font-medium transition-all hover:bg-gray-800 text-slate-300">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+        Secrets View
+      </button>
+
       <div class="mb-4"></div>
 
       <h2 class="text-xs uppercase tracking-widest text-gray-500 font-bold mb-4">Service Status</h2>
@@ -128,8 +140,8 @@
 
     <!-- DynamoDb Explorer -->
     <div id="view-dynamodb" class="view-container hidden h-full flex flex-row overflow-hidden">
-      <div class="w-[20%] bg-gray-950 border-r border-gray-800 p-6 overflow-y-auto">
-        <h3 class="text-xs font-black text-gray-500 uppercase tracking-widest mb-6">Dynamo Tables</h3>
+      <div class="w-[20%] bg-gray-950 border-r border-gray-800 py-6 px-1 overflow-y-auto">
+        <h3 class="text-xs font-black text-gray-500 uppercase tracking-widest px-6 mb-6">Dynamo Tables</h3>
         <div id="ddb-table-list" class="space-y-2">
         </div>
       </div>
@@ -250,6 +262,80 @@
           </div>
 
           <div id="ddb-pagination-controls" class="flex gap-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Secret manager -->
+    <div id="view-secrets" class="view-container hidden h-full flex overflow-hidden bg-gray-950">
+      <div class="w-72 border-r border-gray-800 flex flex-col">
+        <div class="p-4 border-b border-gray-800 flex justify-between items-center">
+          <h3 class="text-xs font-black text-gray-500 uppercase tracking-widest">Secrets</h3>
+          <button onclick="openSecretModal('create')" class="text-orange-500 hover:text-orange-400 text-xs font-bold">+ New</button>
+        </div>
+        <div id="sm-secrets-list" class="flex-1 overflow-y-auto p-2 space-y-1">
+        </div>
+      </div>
+
+      <div id="sm-secret-details" class="flex-1 flex flex-col hidden">
+        <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900/20">
+          <div>
+            <h2 id="sm-active-secret-name" class="text-xl font-bold text-white">secret_name</h2>
+            <p id="sm-active-secret-arn" class="text-[10px] text-gray-500 font-mono"></p>
+          </div>
+          <div class="flex gap-3">
+            <button onclick="deleteSecret()" class="px-3 py-1.5 border border-red-900/50 text-red-500 text-xs rounded hover:bg-red-950 transition-all">Delete</button>
+            <button onclick="openSecretModal('edit')" class="px-4 py-1.5 bg-orange-600 text-white text-xs font-bold rounded hover:bg-orange-500 transition-all">Edit Value</button>
+          </div>
+        </div>
+
+        <div class="p-8 flex-1 overflow-y-auto">
+          <div class="bg-black/40 border border-gray-800 rounded-xl p-6 relative">
+            <div class="flex justify-between items-center mb-4">
+              <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Secret Value</span>
+              <button onclick="toggleSecretVisibility()" id="sm-visibility-btn" class="text-xs text-orange-500 hover:underline">Reveal</button>
+            </div>
+            <pre id="sm-secret-value-display" class="font-mono text-sm text-orange-200 blur-sm select-none transition-all duration-300 whitespace-pre-wrap"></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal -->
+      <div id="secret-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden">
+          <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
+            <div>
+              <h3 id="sm-secret-modal-title" class="text-lg font-bold text-white">Create New Secret</h3>
+              <p class="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Secrets Manager</p>
+            </div>
+            <button onclick="closeSecretModal()" class="text-gray-500 hover:text-white transition-colors">✕</button>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <div id="sm-secret-name-group">
+              <label class="block text-[10px] font-black text-gray-500 uppercase mb-2">Secret Name</label>
+              <label for="sm-modal-secret-name"></label>
+              <input id="sm-modal-secret-name" type="text" placeholder="e.g. /prod/api/key" class="w-full bg-black/50 border border-gray-800 rounded-lg px-4 py-2 text-sm text-white outline-none focus:border-orange-500 transition-all">
+            </div>
+
+            <div>
+              <div class="flex justify-between items-end mb-2">
+                <label class="text-[10px] font-black text-gray-500 uppercase">Secret Value (Text or JSON)</label>
+                <button onclick="formatSecretJson()" class="text-[10px] text-orange-500 hover:underline">Pretty Print JSON</button>
+              </div>
+              <label for="sm-modal-secret-value"></label>
+              <textarea id="sm-modal-secret-value" class="w-full h-64 bg-black/50 border border-gray-800 rounded-xl p-4 text-xs font-mono text-orange-200 outline-none focus:border-orange-500 transition-all" placeholder='{"api_key": "12345"}'></textarea>
+            </div>
+
+            <div id="sm-secret-modal-error" class="hidden p-3 bg-red-500/10 border border-red-500/50 text-red-500 text-[10px] rounded-lg"></div>
+          </div>
+
+          <div class="p-6 border-t border-gray-800 flex justify-end gap-3 bg-gray-950/50">
+            <button onclick="closeSecretModal()" class="px-4 py-2 text-xs font-bold text-gray-400 hover:text-white">Cancel</button>
+            <button onclick="saveSecret()" class="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-bold shadow-lg shadow-orange-900/20 transition-all">
+              Save
+            </button>
+          </div>
         </div>
       </div>
     </div>
