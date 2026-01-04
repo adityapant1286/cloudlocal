@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"bytes"
+	"cloudlocal/internal/utils"
 	"fmt"
 	"io"
 	"net/http"
@@ -47,9 +48,8 @@ func (d *Dispatcher) ProxyToSecrets(w http.ResponseWriter, r *http.Request, acti
 
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
 	req.Header.Set("X-Amz-Target", "secretsmanager."+action)
-
-	// Use the same dummy auth logic we established earlier
-	req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential=cloudlocal/20250101/ap-southeast-2/secretsmanager/aws4_request, ...")
+	req.Header.Set("x-amz-date", "20260101T000000Z")
+	req.Header.Set("Authorization", utils.ApiAuthHeader("secretsmanager"))
 
 	client := &http.Client{}
 	resp, err := client.Do(req)

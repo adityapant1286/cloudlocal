@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"bytes"
+	"cloudlocal/internal/utils"
 	"io"
 	"net/http"
 )
@@ -38,9 +39,8 @@ func (d *Dispatcher) ProxyToKMS(w http.ResponseWriter, r *http.Request, action s
 
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
 	req.Header.Set("X-Amz-Target", "TrentService."+action) // KMS uses "TrentService"
-
-	// Hardcoded dummy auth as established
-	req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential=cloudlocal/20260104/ap-southeast-2/kms/aws4_request, ...")
+	req.Header.Set("x-amz-date", "20260101T000000Z")
+	req.Header.Set("Authorization", utils.ApiAuthHeader("kms"))
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -52,7 +52,6 @@ func (d *Dispatcher) ProxyToKMS(w http.ResponseWriter, r *http.Request, action s
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
 	_, err = io.Copy(w, resp.Body)
 	if err != nil {
 		http.Error(w, "KMS Proxy Copy Error: "+err.Error(), 500)

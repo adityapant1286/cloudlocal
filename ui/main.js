@@ -621,6 +621,146 @@ function copyKmsResult(elementId) {
   });
 }
 
+// SQS Manager
+let sqsCurrentQueueUrl = "";
+
+async function sqsLoadQueues() {
+  const res = await fetch('/dashboard/api/sqs/list');
+  const data = await res.json();
+  const urls = data.QueueUrls || [];
+  const container = document.getElementById('sqs-queue-list');
+
+  container.innerHTML = '';
+  for (const url of urls) {
+    const name = url.split('/').pop();
+    // Fetch counts for each queue
+    const attrRes = await fetch(`/dashboard/api/sqs/attributes?url=${encodeURIComponent(url)}`);
+    const attrData = await attrRes.json();
+    const count = attrData.Attributes.ApproximateNumberOfMessages;
+
+    container.innerHTML += `
+            <button onclick="sqsSelectQueue('${url}', '${name}')" class="w-full text-left p-3 rounded-lg border border-gray-800/50 hover:bg-gray-800 transition-all group">
+                <div class="text-slate-300 text-xs font-bold truncate">${name}</div>
+                <div class="flex justify-between items-center mt-1">
+                    <span class="text-[10px] text-gray-500">Messages</span>
+                    <span class="text-[10px] px-1.5 py-0.5 bg-orange-900/30 text-orange-400 rounded font-mono font-bold">${count}</span>
+                </div>
+            </button>`;
+  }
+}
+
+function sqsSelectQueue(url, name) {
+  sqsCurrentQueueUrl = url;
+
+  // Update UI headers
+  document.getElementById('sqs-active-queue-name').innerText = name;
+  document.getElementById('sqs-active-queue-url').innerText = url;
+
+  // Show the workspace and clear the previous message list
+  document.getElementById('sqs-workspace').classList.remove('hidden');
+  document.getElementById('sqs-messages').innerHTML = `
+        <div class="text-center text-gray-600 text-xs mt-10 italic">
+            Click Poll to peek at messages in ${name}
+        </div>
+    `;
+
+  // Optional: Auto-poll when selecting a queue
+  // receiveMessages();
+}
+
+async function sqsPurgeQueue() {
+  const queueName = document.getElementById('sqs-active-queue-name').innerText;
+
+  if (!confirm(`Are you sure you want to PURGE all messages in "${queueName}"? This cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/dashboard/api/sqs/purge?url=${encodeURIComponent(currentQueueUrl)}`, {
+      method: 'POST'
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to purge queue");
+    }
+
+    // UI Feedback
+    document.getElementById('sqs-messages').innerHTML = `
+            <div class="text-center text-emerald-500 text-xs mt-10 font-bold">
+                Queue purged successfully.
+            </div>
+        `;
+
+    // Refresh the sidebar counts after a short delay (SQS counts are eventual)
+    setTimeout(sqsLoadQueues, 1000);
+
+  } catch (err) {
+    alert("Error purging queue: " + err.message);
+  }
+}
+
+async function sqsReceiveMessages() {
+  const res = await fetch(`/dashboard/api/sqs/receive?url=${encodeURIComponent(sqsCurrentQueueUrl)}`);
+  const data = await res.json();
+  const container = document.getElementById('sqs-messages');
+
+  if (!data.Messages || data.Messages.length === 0) {
+    container.innerHTML = '<div class="text-center text-gray-700 text-xs mt-10">No messages found</div>';
+    return;
+  }
+
+  container.innerHTML = data.Messages.map(m => {
+    // Encode the ReceiptHandle as it can contain special characters
+    const handle = encodeURIComponent(m.ReceiptHandle);
+    return `
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-3 relative group">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-[9px] text-gray-500 font-mono">ID: ${m.MessageId.substring(0,8)}...</span>
+                <button onclick="sqsDeleteMessage('${handle}')" 
+                        class="text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity" 
+                        title="Delete Message">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            </div>
+            <pre class="text-[11px] text-orange-200 overflow-x-auto whitespace-pre-wrap">${m.Body}</pre>
+        </div>
+    `}).join('');
+}
+
+async function sqsSendMessage() {
+  const body = document.getElementById('sqs-send-body').value;
+  await fetch('/dashboard/api/sqs/send', {
+    method: 'POST',
+    body: JSON.stringify({ QueueUrl: sqsCurrentQueueUrl, MessageBody: body })
+  });
+  document.getElementById('sqs-send-body').value = '';
+  await sqsLoadQueues(); // Refresh counts
+}
+
+async function sqsDeleteMessage(encodedHandle) {
+  if (!confirm("Delete this specific message from the queue?")) return;
+
+  try {
+    const res = await fetch(`/dashboard/api/sqs/delete-message?url=${encodeURIComponent(currentQueueUrl)}&handle=${encodedHandle}`, {
+      method: 'POST'
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to delete message");
+    }
+
+    // Refresh the list to show it's gone
+    await sqsReceiveMessages();
+    // Update sidebar counts (delayed slightly to allow SQS to sync)
+    setTimeout(sqsLoadQueues, 500);
+
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+}
+
 // system overview
 let eventSource = null;
 
@@ -636,22 +776,31 @@ async function showView(viewId) {
   document.getElementById(`view-${viewId}`).classList.remove('hidden');
   if (viewId === 'overview') {
     await fetchOverviewData();
+    return
   }
   // Update UI if switching to DynamoDB
   if (viewId === 'dynamodb') {
     await ddbLoadTables();
+    return
   }
 
   if (viewId === 'secrets') {
     await loadSecrets();
+    return
   }
 
   if (viewId === 'kms') {
     await loadKmsKeys();
+    return
+  }
+
+  if (viewId === 'sqs') {
+    await sqsLoadQueues();
   }
 
 }
 
+/*
 async function triggerAction(action, service, target) {
   if (!confirm(`Are you sure you want to ${action.replace('_',' ')} for ${target}?`)) return;
 
@@ -663,6 +812,7 @@ async function triggerAction(action, service, target) {
   await fetchOverviewData(); // Refresh UI
 
 }
+*/
 
 async function fetchOverviewData() {
   try {
@@ -681,6 +831,7 @@ async function fetchOverviewData() {
                 `).join('');
 
     // 2. Update Storage Grid
+/*
     const storageGrid = document.getElementById('storage-grid');
     storageGrid.innerHTML = Object.entries(data.storage).map(([svc, size]) => `
                     <div class="bg-stone-900 border border-stone-800 p-4 rounded-2xl hover:border-stone-700 transition-colors">
@@ -688,9 +839,11 @@ async function fetchOverviewData() {
                         <div class="text-2xl font-black text-white mt-2">${size}</div>
                     </div>
                 `).join('');
+*/
 
     document.getElementById('vol-path').innerText = data.volume_path;
 
+/*
     if (data.buckets !== undefined) {
       const s3Container = document.getElementById('s3-actions');
       s3Container.innerHTML = data.buckets.map(b => `
@@ -700,6 +853,8 @@ async function fetchOverviewData() {
         </div>
       `).join('');
     }
+*/
+
   } catch (err) {
     console.error("Dashboard sync error:", err);
   }

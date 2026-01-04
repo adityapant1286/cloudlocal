@@ -53,6 +53,11 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			if strings.HasPrefix(r.URL.Path, "/dashboard/api/sqs") {
+				d.HandleSQSAdmin(w, r)
+				return
+			}
+
 			return
 		}
 

@@ -45,6 +45,10 @@ type ServiceHandler interface {
 	Handle(w http.ResponseWriter, r *http.Request, target string)
 }
 
+func ApiAuthHeader(service string) string {
+	return fmt.Sprintf("AWS4-HMAC-SHA256 Credential=cloudlocal/20260101/%s/%s/aws4_request, SignedHeaders=host;x-amz-date;x-amz-target, Signature=dummy", AwsRegion, service)
+}
+
 func IsServiceEnabled(service string) bool {
 	return strings.Contains(EnabledServices, strings.ToLower(service))
 }
