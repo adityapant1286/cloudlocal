@@ -7,6 +7,23 @@
   <link rel="icon" href="favicon.ico">
   <link href="styles.css" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Styling the scrollbar for a better dark-mode look */
+    .ddb-custom-scrollbar::-webkit-scrollbar {
+      height: 8px;
+      width: 8px;
+    }
+    .ddb-custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a; /* gray-950 */
+    }
+    .ddb-custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155; /* gray-700 */
+      border-radius: 4px;
+    }
+    .ddb-custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #ea580c; /* orange-600 */
+    }
+  </style>
 </head>
 <body class="bg-stone-950 text-slate-200 font-sans">
 <div class="flex h-screen">
@@ -43,6 +60,7 @@
 
   <!-- Main contents -->
   <main class="flex-1 relative overflow-hidden">
+
     <!-- System Overview -->
     <div id="view-overview" class="view-container h-full overflow-y-auto p-10">
       <div class="flex justify-between items-start mb-4">
@@ -107,15 +125,16 @@
         </div>
       </section>
     </div>
+
     <!-- DynamoDb Explorer -->
     <div id="view-dynamodb" class="view-container hidden h-full flex flex-row overflow-hidden">
-      <div class="w-64 bg-gray-950 border-r border-gray-800 p-6 overflow-y-auto">
+      <div class="w-[20%] bg-gray-950 border-r border-gray-800 p-6 overflow-y-auto">
         <h3 class="text-xs font-black text-gray-500 uppercase tracking-widest mb-6">Dynamo Tables</h3>
         <div id="ddb-table-list" class="space-y-2">
         </div>
       </div>
 
-      <div class="flex-1 flex flex-col bg-gray-900/20">
+      <div class="w-[80%] flex-1 flex flex-col bg-gray-900/20">
         <!-- DynamoDb table - header controls -->
         <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900/40">
           <div class="flex items-center gap-3">

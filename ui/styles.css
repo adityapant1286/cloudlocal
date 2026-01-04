@@ -4,19 +4,3 @@
 @keyframes pulse {
   0%, 100% { opacity: 1; } 50% { opacity: .5; }
 }
-
-/* Styling the scrollbar for a better dark-mode look */
-.ddb-custom-scrollbar::-webkit-scrollbar {
-  height: 8px;
-  width: 8px;
-}
-.ddb-custom-scrollbar::-webkit-scrollbar-track {
-  background: #0f172a; /* gray-950 */
-}
-.ddb-custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #334155; /* gray-700 */
-  border-radius: 4px;
-}
-.ddb-custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #ea580c; /* orange-600 */
-}
