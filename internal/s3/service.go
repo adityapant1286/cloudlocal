@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -37,14 +38,14 @@ func NewS3Service() ServiceHandler {
 
 func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Request, target string) {
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	log.Printf("%s", target)
+	log.Printf("%v", target)
 	queryParams := r.URL.Query()
 	if len(parts) == 0 || parts[0] == "" {
 		// List Buckets (GET /)
 		resp := svc.s3.listBuckets()
 		// xml
 		w.WriteHeader(http.StatusOK)
-		utils.RespondXML(w, resp)
+		utils.RespondJSON(w, resp)
 		return
 	}
 
@@ -61,7 +62,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 			etag, err := svc.s3.uploadPart(uploadID, partNum, r.Body)
 			if err != nil {
 				w.WriteHeader(http.StatusNotFound)
-				utils.RespondXML(w, map[string]any{
+				utils.RespondJSON(w, map[string]any{
 					"Error": err.Error(),
 				})
 				return
@@ -76,7 +77,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 		if key == "" {
 			if err := svc.s3.createBucket(bucket); err != nil {
 				w.WriteHeader(http.StatusConflict)
-				utils.RespondXML(w, map[string]any{
+				utils.RespondJSON(w, map[string]any{
 					"Error": err.Error(),
 				})
 				return
@@ -88,7 +89,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 		// 3. Put Object: PUT /bucket/key
 		if err := svc.s3.putObject(bucket, key, r.Body); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			utils.RespondXML(w, map[string]any{
+			utils.RespondJSON(w, map[string]any{
 				"Error": err.Error(),
 			})
 			return
@@ -100,7 +101,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 			prefix := queryParams.Get("prefix")
 			resp, _ := svc.s3.listObjectsV2(bucket, prefix)
 			w.WriteHeader(http.StatusOK)
-			utils.RespondXML(w, resp)
+			utils.RespondJSON(w, resp)
 			return
 		}
 
@@ -115,10 +116,33 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		defer data.Close()
-		io.Copy(w, data) // Stream file back to user
+		_, err = io.Copy(w, data) // Stream file back to user
+		if err != nil {
+			log.Fatalf("Error copying data: %v", err)
+			return
+		}
 	case http.MethodDelete:
+		if key == "" {
+			err := svc.s3.deleteBucket(bucket)
+			if err != nil {
+				w.WriteHeader(http.StatusUnprocessableEntity)
+				utils.RespondJSON(w, map[string]any{
+					"Error": err.Error(),
+				})
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		// Single Delete: DELETE /bucket/key
-		_ = svc.s3.deleteObject(bucket, key)
+		err := svc.s3.deleteObject(bucket, key)
+		if err != nil {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			utils.RespondJSON(w, map[string]any{
+				"Error": err.Error(),
+			})
+			return
+		}
 		w.WriteHeader(http.StatusNoContent) // No Content is standard for S3 Delete
 	case http.MethodPost:
 		// Initiate Multipart: POST /bucket/key?uploads
@@ -127,15 +151,15 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 			err := svc.s3.initMultipartUpload(bucket, key, uploadID)
 			if err != nil {
 				w.WriteHeader(http.StatusUnprocessableEntity)
-				utils.RespondXML(w, map[string]any{
+				utils.RespondJSON(w, map[string]any{
 					"Error": err.Error(),
 				})
 				return
 			}
 
 			w.WriteHeader(http.StatusOK)
-			utils.RespondXML(w, InitiateMultipartUploadResult{
-				Xmlns:    "http://s3.amazonaws.com/doc/2006-03-01/",
+			utils.RespondJSON(w, InitiateMultipartUploadResult{
+				//Xmlns:    "http://s3.amazonaws.com/doc/2006-03-01/",
 				Bucket:   bucket,
 				Key:      key,
 				UploadId: uploadID,
@@ -152,27 +176,28 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 			)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				utils.RespondXML(w, map[string]any{
+				utils.RespondJSON(w, map[string]any{
 					"Error": err.Error(),
 				})
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			utils.RespondXML(w, res)
+			utils.RespondJSON(w, res)
 			return
 		}
 
 		// Bulk Delete: POST /bucket?delete
 		if queryParams.Has("delete") {
 			resp := DeleteResult{
-				Xmlns: "http://s3.amazonaws.com/doc/2006-03-01/",
+				//Xmlns: "http://s3.amazonaws.com/doc/2006-03-01/",
 			}
 
 			var delReq DeleteRequest
-			err := utils.DecodeXml(r.Body, &delReq)
+			body, _ := io.ReadAll(r.Body)
+			err := utils.UnmarshalJsonErrors(body, &delReq)
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
-				utils.RespondXML(w, map[string]any{
+				utils.RespondJSON(w, map[string]any{
 					"Error": err.Error(),
 				})
 				return
@@ -186,7 +211,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 			deleted, err := svc.s3.deleteObjects(bucket, keys)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				utils.RespondXML(w, map[string]any{
+				utils.RespondJSON(w, map[string]any{
 					"Error": err.Error(),
 				})
 				return
@@ -196,7 +221,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 				resp.Deleted = append(resp.Deleted, DeletedObject{Key: k})
 			}
 			w.WriteHeader(http.StatusOK)
-			utils.RespondXML(w, resp)
+			utils.RespondJSON(w, resp)
 		}
 	}
 }
@@ -279,15 +304,19 @@ func (s *s3Implementation) deleteBucket(name string) error {
 
 func (s *s3Implementation) listBuckets() ListBucketsResponse {
 	resp := ListBucketsResponse{
-		Xmlns: "http://s3.amazonaws.com/doc/2006-03-01/",
+		//Xmlns: "http://s3.amazonaws.com/doc/2006-03-01/",
 		Owner: Owner{ID: utils.S3OwnerId, DisplayName: "cloudlocal"},
 	}
+	log.Printf("\n\nBefore list S3 buckets:\n%s\n\n", utils.MarshalIjson(s.buckets))
 
-	bkt := make([]Bucket, len(s.buckets))
-	for _, bucket := range s.buckets {
-		bkt = append(bkt, *bucket)
+	values := make([]Bucket, 0, len(s.buckets))
+	for e := range maps.Values(s.buckets) {
+		if e != nil {
+			values = append(values, *e)
+		}
 	}
-	resp.Buckets = bkt
+	resp.Buckets = values
+
 	log.Printf("Listing S3 buckets:\n%s\n\n", utils.MarshalIjson(resp))
 	return resp
 }
@@ -318,7 +347,7 @@ func (s *s3Implementation) getObject(bucket, key string) (io.ReadCloser, error) 
 func (s *s3Implementation) listObjectsV2(bucket, prefix string) (ListObjectsV2Response, error) {
 	bucketPath := filepath.Join(s.storagePath, bucket)
 	resp := ListObjectsV2Response{
-		Xmlns:   "http://s3.amazonaws.com/doc/2006-03-01/",
+		//Xmlns:   "http://s3.amazonaws.com/doc/2006-03-01/",
 		Name:    bucket,
 		Prefix:  prefix,
 		MaxKeys: 1000,

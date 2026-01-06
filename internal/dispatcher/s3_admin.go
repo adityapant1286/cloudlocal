@@ -3,52 +3,137 @@ package dispatcher
 import (
 	"bytes"
 	"cloudlocal/internal/utils"
-	"fmt"
+	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
 )
 
+type proxyS3Input struct {
+	writer http.ResponseWriter
+	method string
+	url    string
+	action string
+	reader io.Reader
+}
+
 func (d *Dispatcher) HandleS3Admin(w http.ResponseWriter, r *http.Request) {
-	action := ""
-	var payload []byte
+	//action := ""
+	//method := http.MethodPost
+	//var payload []byte
+	var input *proxyS3Input = nil
 
 	switch r.URL.Path {
 	case "/dashboard/api/s3/list-buckets":
-		action = "ListBuckets"
-		payload = []byte("{}")
+		input = &proxyS3Input{
+			writer: w,
+			method: http.MethodGet,
+			url:    utils.CloudLocalUrl + "/",
+			action: "ListBuckets",
+		}
 	case "/dashboard/api/s3/list-objects":
 		bucket := r.URL.Query().Get("bucket")
-		action = "ListObjectsV2"
-		payload = []byte(fmt.Sprintf(`{"Bucket": "%s"}`, bucket))
+		input = &proxyS3Input{
+			writer: w,
+			method: http.MethodGet,
+			url:    utils.CloudLocalUrl + "/" + bucket + "?list-type=2",
+			action: "ListObjectsV2",
+		}
+	case "/dashboard/api/s3/create-bucket":
+		bucket := r.URL.Query().Get("name")
+		input = &proxyS3Input{
+			writer: w,
+			method: http.MethodPut,
+			url:    utils.CloudLocalUrl + "/" + bucket + "/",
+			action: "CreateBucket",
+		}
+	case "/dashboard/api/s3/delete-bucket":
+		bucket := r.URL.Query().Get("name")
+		input = &proxyS3Input{
+			writer: w,
+			method: http.MethodDelete,
+			url:    utils.CloudLocalUrl + "/" + bucket + "/",
+			action: "DeleteBucket",
+		}
 	case "/dashboard/api/s3/upload":
-		// For simplicity, we'll handle small text/JSON uploads via proxy
-		action = "PutObject"
-		body, _ := io.ReadAll(r.Body)
-		payload = body
-	case "/dashboard/api/s3/delete":
-		bucket := r.URL.Query().Get("bucket")
-		key := r.URL.Query().Get("key")
-		action = "DeleteObject"
-		payload = []byte(fmt.Sprintf(`{"Bucket": "%s", "Key": "%s"}`, bucket, key))
+		var s3UploadPayload struct {
+			Bucket string `json:"Bucket"`
+			Key    string `json:"Key"`
+			Body   string `json:"Body"` // Base64 from frontend
+		}
+		_ = json.NewDecoder(r.Body).Decode(&s3UploadPayload)
+		rawBody, _ := base64.StdEncoding.DecodeString(s3UploadPayload.Body)
+		input = &proxyS3Input{
+			writer: w,
+			method: http.MethodPut,
+			url:    utils.CloudLocalUrl + "/" + s3UploadPayload.Bucket + "/" + s3UploadPayload.Key,
+			action: "PutObject",
+			reader: bytes.NewReader(rawBody),
+		}
 	case "/dashboard/api/s3/get-object":
 		bucket := r.URL.Query().Get("bucket")
 		key := r.URL.Query().Get("key")
-		action = "GetObject"
-		// GetObject typically doesn't need a JSON body in the proxy,
-		// but some proxies prefer it for consistency.
-		payload = []byte(fmt.Sprintf(`{"Bucket": "%s", "Key": "%s"}`, bucket, key))
+		input = &proxyS3Input{
+			writer: w,
+			method: http.MethodGet,
+			url:    utils.CloudLocalUrl + "/" + bucket + "/" + key,
+			action: "GetObject",
+		}
+	case "/dashboard/api/s3/delete":
+		bucket := r.URL.Query().Get("bucket")
+		key := r.URL.Query().Get("key")
+		input = &proxyS3Input{
+			writer: w,
+			method: http.MethodDelete,
+			url:    utils.CloudLocalUrl + "/" + bucket + "/" + key,
+			action: "DeleteObject",
+		}
 	}
 
-	if action != "" {
-		d.ProxyToS3(w, r, action, payload)
+	if input != nil {
+		d.ProxyToS3(*input)
 	}
 }
 
-func (d *Dispatcher) ProxyToS3(w http.ResponseWriter, r *http.Request, action string, payload []byte) {
-	req, _ := http.NewRequest("POST", utils.CloudLocalUrl, bytes.NewBuffer(payload))
-	req.Header.Set("X-Amz-Target", "AmazonS3."+action)
-	// S3 often uses XML, but LocalStack's JSON proxy supports this header:
+func (d *Dispatcher) ProxyToS3(input proxyS3Input) {
+
+	req, _ := http.NewRequest(input.method, input.url, input.reader)
+	//req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+	req.Header.Set("X-Amz-Target", "AmazonS3."+input.action)
+	req.Header.Set("x-amz-date", "20260101T000000Z")
+	req.Header.Set("Authorization", utils.ApiAuthHeader("s3"))
+
+	writer := input.writer
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(writer, "S3 Proxy Error: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Forward the DynamoDB response back to the Dashboard
+
+	if input.action == "GetObject" {
+		writer.Header().Set("Content-Type", "application/json")
+		data, _ := io.ReadAll(resp.Body)
+		utils.RespondJSON(writer, map[string]string{"Body": base64.StdEncoding.EncodeToString(data)})
+		return
+	}
+	writer.WriteHeader(resp.StatusCode)
+	_, err = io.Copy(writer, resp.Body)
+	if err != nil {
+		http.Error(writer, "S3 Proxy Copy Error: "+err.Error(), 500)
+		return
+	}
+}
+
+/*
+func (d *Dispatcher) ProxyToS3(w http.ResponseWriter, method string, action string, payload []byte) {
+	req, _ := http.NewRequest(method, utils.CloudLocalUrl, bytes.NewBuffer(payload))
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+	req.Header.Set("X-Amz-Target", "AmazonS3."+action)
 	req.Header.Set("x-amz-date", "20260101T000000Z")
 	req.Header.Set("Authorization", utils.ApiAuthHeader("s3"))
 
@@ -69,3 +154,4 @@ func (d *Dispatcher) ProxyToS3(w http.ResponseWriter, r *http.Request, action st
 		return
 	}
 }
+*/

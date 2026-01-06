@@ -1,35 +1,60 @@
-
 // Dynamodb
 const DynamoDbParser = {
   // Convert DynamoDB JSON -> Standard JSON
-  unmarshall: function(data) {
-    if (!data || typeof data !== 'object') return data;
-    if (data.S !== undefined) return data.S;
-    if (data.N !== undefined) return Number(data.N);
-    if (data.BOOL !== undefined) return data.BOOL;
-    if (data.NULL !== undefined) return null;
+  unmarshall: function (data) {
+    if (!data || typeof data !== 'object') {
+      return data;
+    }
+    if (data.S !== undefined) {
+      return data.S;
+    }
+    if (data.N !== undefined) {
+      return Number(data.N);
+    }
+    if (data.BOOL !== undefined) {
+      return data.BOOL;
+    }
+    if (data.NULL !== undefined) {
+      return null;
+    }
     if (data.M) {
       let obj = {};
-      for (let k in data.M) obj[k] = this.unmarshall(data.M[k]);
+      for (let k in data.M) {
+        obj[k] = this.unmarshall(data.M[k]);
+      }
       return obj;
     }
-    if (data.L) return data.L.map(v => this.unmarshall(v));
+    if (data.L) {
+      return data.L.map(v => this.unmarshall(v));
+    }
     return data;
   },
 
   // Convert Standard JSON -> DynamoDB JSON (for Create/Update)
-  marshall: function(data) {
-    if (typeof data === 'string') return { S: data };
-    if (typeof data === 'number') return { N: data.toString() };
-    if (typeof data === 'boolean') return { BOOL: data };
-    if (data === null) return { NULL: true };
-    if (Array.isArray(data)) return { L: data.map(v => this.marshall(v)) };
+  marshall: function (data) {
+    if (typeof data === 'string') {
+      return {S: data};
+    }
+    if (typeof data === 'number') {
+      return {N: data.toString()};
+    }
+    if (typeof data === 'boolean') {
+      return {BOOL: data};
+    }
+    if (data === null) {
+      return {NULL: true};
+    }
+    if (Array.isArray(data)) {
+      return {L: data.map(v => this.marshall(v))};
+    }
     if (typeof data === 'object') {
       let m = {};
-      for (let k in data) m[k] = this.marshall(data[k]);
-      return { M: m };
+      for (let k in data) {
+        m[k] = this.marshall(data[k]);
+      }
+      return {M: m};
     }
-    return { S: String(data) };
+    return {S: String(data)};
   }
 };
 
@@ -41,8 +66,10 @@ let tableSchemas = {}; // Cache for { tableName: { pk: 'id', sk: 'timestamp' } }
 
 async function selectDdbTable(tableName) {
   // Highlight the selected button
-  document.querySelectorAll('.table-btn').forEach(b => b.classList.remove('bg-gray-800', 'border-gray-700', 'text-white'));
-  event.currentTarget.classList.add('bg-gray-800', 'border-gray-700', 'text-white');
+  document.querySelectorAll('.table-btn').forEach(
+      b => b.classList.remove('bg-gray-800', 'border-gray-700', 'text-white'));
+  event.currentTarget.classList.add('bg-gray-800', 'border-gray-700',
+      'text-white');
 
   currentDdbTable = tableName;
   ddbLastEvaluatedKey = null;
@@ -50,13 +77,18 @@ async function selectDdbTable(tableName) {
 
   if (!tableSchemas[tableName]) {
     try {
-      const res = await fetch(`/dashboard/api/dynamo/describe?table=${tableName}`);
+      const res = await fetch(
+          `/dashboard/api/dynamo/describe?table=${tableName}`);
       const data = await res.json();
 
-      const schema = { pk: null, sk: null };
+      const schema = {pk: null, sk: null};
       data.Table.KeySchema.forEach(key => {
-        if (key.KeyType === 'HASH') schema.pk = key.AttributeName;
-        if (key.KeyType === 'RANGE') schema.sk = key.AttributeName;
+        if (key.KeyType === 'HASH') {
+          schema.pk = key.AttributeName;
+        }
+        if (key.KeyType === 'RANGE') {
+          schema.sk = key.AttributeName;
+        }
       });
       tableSchemas[tableName] = schema;
     } catch (err) {
@@ -88,7 +120,9 @@ async function ddbLoadTables() {
 }
 
 async function fetchDdbTableData(next = false) {
-  if (!currentDdbTable) return;
+  if (!currentDdbTable) {
+    return;
+  }
 
   const ddbRefreshIcon = document.getElementById('ddb-refresh-icon');
   const ddbRowCount = document.getElementById('ddb-row-count');
@@ -118,9 +152,11 @@ async function fetchDdbTableData(next = false) {
     const result = await res.json();
     ddbLastEvaluatedKey = result.LastEvaluatedKey;
 
-    const items = result.Items.map(item => DynamoDbParser.unmarshall({M: item}));
+    const items = result.Items.map(
+        item => DynamoDbParser.unmarshall({M: item}));
     if (ddbRowCount) {
-      ddbRowCount.innerText = `${items.length} Item${items.length === 1 ? '' : 's'}`;
+      ddbRowCount.innerText = `${items.length} Item${items.length === 1 ? ''
+          : 's'}`;
     }
     renderDdbTableGrid(items);
     // Update the column dropdown based on the keys we found
@@ -161,7 +197,8 @@ function updateDdbFilterDropdown(items) {
   const currentVal = select.value;
 
   select.innerHTML = '<option value="">Select Column</option>' +
-      keys.map(k => `<option value="${k}" ${k === currentVal ? 'selected' : ''}>${k}</option>`).join('');
+      keys.map(k => `<option value="${k}" ${k === currentVal ? 'selected'
+          : ''}>${k}</option>`).join('');
 }
 
 async function toggleDdbAutoRefresh() {
@@ -193,7 +230,8 @@ function renderDdbTableGrid(items) {
             ${keys.map(k => `
                 <th class="p-3 text-gray-400 border-b border-gray-700 whitespace-nowrap bg-gray-800">
                     <div class="flex items-center gap-1">
-                        ${(k === schema.pk || k === schema.sk) ? '<span class="text-orange-500">🔑</span>' : ''}
+                        ${(k === schema.pk || k === schema.sk)
+      ? '<span class="text-orange-500">🔑</span>' : ''}
                         ${k}
                     </div>
                 </th>
@@ -208,12 +246,13 @@ function renderDdbTableGrid(items) {
     return `
         <tr class="hover:bg-gray-800/30 group transition-colors">
             ${keys.map(k => {
-              const val = item[k];
-              const displayVal = (typeof val === 'object' && val !== null) ? JSON.stringify(val) : (val ?? '-');
-        
-              // Create a safe string for the onclick handler
-              const safeVal = encodeURIComponent(JSON.stringify(val));
-              return `
+      const val = item[k];
+      const displayVal = (typeof val === 'object' && val !== null)
+          ? JSON.stringify(val) : (val ?? '-');
+
+      // Create a safe string for the onclick handler
+      const safeVal = encodeURIComponent(JSON.stringify(val));
+      return `
                 <td class="p-3 text-slate-300 border-b border-gray-800/50 whitespace-nowrap overflow-hidden text-ellipsis max-w-[250px]">
                   <div onclick="openCellModal('${k}', JSON.parse(decodeURIComponent('${safeVal}')))" 
                        class="cursor-pointer hover:text-orange-400 transition-colors"
@@ -221,7 +260,7 @@ function renderDdbTableGrid(items) {
                       ${displayVal}
                   </div>
                 </td>`;
-            }).join('')}
+    }).join('')}
             <td class="p-3 border-b border-gray-800/50 text-right space-x-2 whitespace-nowrap">
               <button onclick="duplicateDdbItem('${itemStr}')" class="text-emerald-400 hover:text-emerald-300 transition-colors inline-block" title="Duplicate">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -242,14 +281,16 @@ function renderDdbTableGrid(items) {
               </button>
             </td>
         </tr>
-    `}).join('');
+    `
+  }).join('');
 
 }
 
 function openDdbItemCreateModal() {
   document.getElementById('ddb-item-create-modal').classList.remove('hidden');
   document.getElementById('ddb-item-active-modal-title').innerText = "New Item";
-  document.getElementById('ddb-item-json').value = '{\n  "id": "' + Math.random().toString(36).substr(2, 9) + '"\n}';
+  document.getElementById('ddb-item-json').value = '{\n  "id": "'
+      + Math.random().toString(36).substr(2, 9) + '"\n}';
 }
 
 function closeDdbItemCreateModal() {
@@ -278,7 +319,9 @@ async function saveDdbItem() {
       })
     });
 
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) {
+      throw new Error(await res.text());
+    }
 
     closeDdbItemCreateModal();
     await fetchDdbTableData(); // Refresh grid
@@ -289,13 +332,17 @@ async function saveDdbItem() {
 }
 
 async function deleteDdbItem(itemJsonString) {
-  if (!confirm("Delete this item permanently?")) return;
+  if (!confirm("Delete this item permanently?")) {
+    return;
+  }
 
   try {
     const item = JSON.parse(decodeURIComponent(itemJsonString));
     const schema = tableSchemas[currentDdbTable];
 
-    if (!schema || !schema.pk) throw new Error("Table schema not loaded");
+    if (!schema || !schema.pk) {
+      throw new Error("Table schema not loaded");
+    }
 
     const delPayload = {};
     delPayload[schema.pk] = DynamoDbParser.marshall(item[schema.pk]);
@@ -326,10 +373,12 @@ async function deleteDdbItem(itemJsonString) {
 function openDdbItemEditModal(itemJsonString) {
   const item = JSON.parse(decodeURIComponent(itemJsonString));
   document.getElementById('ddb-item-create-modal').classList.remove('hidden');
-  document.getElementById('ddb-item-active-modal-title').innerText = "Edit Item";
+  document.getElementById(
+      'ddb-item-active-modal-title').innerText = "Edit Item";
 
   // Fill the textarea with the current item's standard JSON
-  document.getElementById('ddb-item-json').value = JSON.stringify(item, null, 2);
+  document.getElementById('ddb-item-json').value = JSON.stringify(item, null,
+      2);
 }
 
 function duplicateDdbItem(itemJsonString) {
@@ -337,11 +386,13 @@ function duplicateDdbItem(itemJsonString) {
 
   // Open the same modal we use for Create/Edit
   document.getElementById('ddb-item-create-modal').classList.remove('hidden');
-  document.getElementById('ddb-item-active-modal-title').innerText = "Duplicate Item";
+  document.getElementById(
+      'ddb-item-active-modal-title').innerText = "Duplicate Item";
 
   // Fill the textarea with the current item's JSON
   // The user will need to change the ID/Partition Key before clicking Save
-  document.getElementById('ddb-item-json').value = JSON.stringify(item, null, 2);
+  document.getElementById('ddb-item-json').value = JSON.stringify(item, null,
+      2);
 
   // Focus the textarea so they can start editing immediately
   document.getElementById('ddb-item-json').focus();
@@ -352,12 +403,14 @@ async function applyDdbFilter() {
   const op = document.getElementById('ddb-filter-operator').value;
   const val = document.getElementById('ddb-filter-value').value;
 
-  if (!col || !val) return;
+  if (!col || !val) {
+    return;
+  }
 
   // Build DynamoDB Filter Expression
   let expression = "";
-  const attrValues = { ":val": DynamoDbParser.marshall(val) };
-  const attrNames = { "#col": col };
+  const attrValues = {":val": DynamoDbParser.marshall(val)};
+  const attrNames = {"#col": col};
 
   if (op === "contains") {
     expression = `contains(#col, :val)`;
@@ -474,11 +527,12 @@ async function saveSecret() {
   const errorEl = document.getElementById('sm-secret-modal-error');
 
   // For 'create', we use a specific API. For 'edit', we use another.
-  const endpoint = secretModalMode === 'create' ? '/dashboard/api/secrets/create' : '/dashboard/api/secrets/put';
+  const endpoint = secretModalMode === 'create'
+      ? '/dashboard/api/secrets/create' : '/dashboard/api/secrets/put';
 
   const payload = secretModalMode === 'create'
-      ? { Name: name, SecretString: value }
-      : { SecretId: smCurrentSecret, SecretString: value };
+      ? {Name: name, SecretString: value}
+      : {SecretId: smCurrentSecret, SecretString: value};
 
   try {
     const res = await fetch(endpoint, {
@@ -502,12 +556,15 @@ async function saveSecret() {
 }
 
 async function deleteSecret() {
-  if (!confirm(`Are you sure you want to delete ${smCurrentSecret}?`)) return;
+  if (!confirm(`Are you sure you want to delete ${smCurrentSecret}?`)) {
+    return;
+  }
 
   try {
-    const res = await fetch(`/dashboard/api/secrets/delete?name=${smCurrentSecret}`, {
-      method: 'POST'
-    });
+    const res = await fetch(
+        `/dashboard/api/secrets/delete?name=${smCurrentSecret}`, {
+          method: 'POST'
+        });
 
     if (!res.ok) {
       throw new Error("Failed to delete secret");
@@ -561,21 +618,24 @@ async function kmsDecrypt() {
   const blob = document.getElementById('kms-decrypt-input').value;
   const res = await fetch('/dashboard/api/kms/decrypt', {
     method: 'POST',
-    body: JSON.stringify({ CiphertextBlob: blob })
+    body: JSON.stringify({CiphertextBlob: blob})
   });
   const data = await res.json();
   // Decode base64 result back to text
-  document.getElementById('kms-decrypt-output').innerText = atob(data.Plaintext);
+  document.getElementById('kms-decrypt-output').innerText = atob(
+      data.Plaintext);
 }
 
 async function createKmsKey() {
-  await fetch('/dashboard/api/kms/create', { method: 'POST' });
+  await fetch('/dashboard/api/kms/create', {method: 'POST'});
   await loadKmsKeys();
 }
 
 function copyKmsResult(elementId) {
   const text = document.getElementById(elementId).innerText;
-  if (!text) return;
+  if (!text) {
+    return;
+  }
 
   navigator.clipboard.writeText(text).then(() => {
     const btn = event.currentTarget;
@@ -603,7 +663,8 @@ async function sqsLoadQueues() {
   for (const url of urls) {
     const name = url.split('/').pop();
     // Fetch counts for each queue
-    const attrRes = await fetch(`/dashboard/api/sqs/attributes?url=${encodeURIComponent(url)}`);
+    const attrRes = await fetch(
+        `/dashboard/api/sqs/attributes?url=${encodeURIComponent(url)}`);
     const attrData = await attrRes.json();
     const count = attrData.Attributes.ApproximateNumberOfMessages;
 
@@ -640,14 +701,16 @@ function sqsSelectQueue(url, name) {
 async function sqsPurgeQueue() {
   const queueName = document.getElementById('sqs-active-queue-name').innerText;
 
-  if (!confirm(`Are you sure you want to PURGE all messages in "${queueName}"? This cannot be undone.`)) {
+  if (!confirm(
+      `Are you sure you want to PURGE all messages in "${queueName}"? This cannot be undone.`)) {
     return;
   }
 
   try {
-    const res = await fetch(`/dashboard/api/sqs/purge?url=${encodeURIComponent(currentQueueUrl)}`, {
-      method: 'POST'
-    });
+    const res = await fetch(
+        `/dashboard/api/sqs/purge?url=${encodeURIComponent(currentQueueUrl)}`, {
+          method: 'POST'
+        });
 
     if (!res.ok) {
       throw new Error("Failed to purge queue");
@@ -684,7 +747,7 @@ async function sqsReceiveMessages() {
     return `
         <div class="bg-gray-900 border border-gray-800 rounded-lg p-3 relative group">
             <div class="flex justify-between items-center mb-2">
-                <span class="text-[9px] text-gray-500 font-mono">ID: ${m.MessageId.substring(0,8)}...</span>
+                <span class="text-[9px] text-gray-500 font-mono">ID: ${m.MessageId.substring(0, 8)}...</span>
                 <button onclick="sqsDeleteMessage('${handle}')" 
                         class="text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity" 
                         title="Delete Message">
@@ -695,26 +758,30 @@ async function sqsReceiveMessages() {
             </div>
             <pre class="text-[11px] text-orange-200 overflow-x-auto whitespace-pre-wrap">${m.Body}</pre>
         </div>
-    `}).join('');
+    `
+  }).join('');
 }
 
 async function sqsSendMessage() {
   const body = document.getElementById('sqs-send-body').value;
   await fetch('/dashboard/api/sqs/send', {
     method: 'POST',
-    body: JSON.stringify({ QueueUrl: sqsCurrentQueueUrl, MessageBody: body })
+    body: JSON.stringify({QueueUrl: sqsCurrentQueueUrl, MessageBody: body})
   });
   document.getElementById('sqs-send-body').value = '';
   await sqsLoadQueues(); // Refresh counts
 }
 
 async function sqsDeleteMessage(encodedHandle) {
-  if (!confirm("Delete this specific message from the queue?")) return;
+  if (!confirm("Delete this specific message?")) {
+    return;
+  }
 
   try {
-    const res = await fetch(`/dashboard/api/sqs/delete-message?url=${encodeURIComponent(currentQueueUrl)}&handle=${encodedHandle}`, {
-      method: 'POST'
-    });
+    const res = await fetch(
+        `/dashboard/api/sqs/delete-message?url=${encodeURIComponent(sqsCurrentQueueUrl)}&handle=${encodedHandle}`, {
+          method: 'POST'
+        });
 
     if (!res.ok) {
       throw new Error("Failed to delete message");
@@ -732,25 +799,121 @@ async function sqsDeleteMessage(encodedHandle) {
 
 // S3 Manager
 let s3CurrentBucket = "";
+let s3CurrentBucketPath = "";
 
 async function s3LoadBuckets() {
   const res = await fetch('/dashboard/api/s3/list-buckets');
   const data = await res.json();
   const container = document.getElementById('s3-bucket-list');
 
-  container.innerHTML = data.Buckets.map(b => `
-        <button onclick="s3SelectBucket('${b.Name}')" class="w-full text-left px-4 py-3 rounded-lg text-sm transition-all hover:bg-gray-800 group border border-transparent hover:border-gray-700">
-            <div class="text-slate-300 font-medium flex items-center gap-2">
-                <svg class="w-3 h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
-                ${b.Name}
-            </div>
-        </button>
+  if (data && data.Buckets) {
+    container.innerHTML = data.Buckets.map(b => `
+        <div class="flex items-center group px-2 rounded-lg hover:bg-gray-800 transition-all">
+            <button onclick="s3SelectBucket('${b.Name}', '${b.Path}')" class="flex-1 text-left py-3 text-sm flex items-center gap-2 overflow-hidden">
+                <svg class="w-5 h-5 text-yellow-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+                <span class="text-slate-300 truncate">${b.Name}</span>
+            </button>
+            
+            <button onclick="s3DeleteBucket('${b.Name}')" class="p-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+            </button>
+        </div>
     `).join('');
+  }
 }
 
-async function s3SelectBucket(name) {
+// Validation Logic
+function s3ValidateBucketName(name) {
+  const regex = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
+  const isValid = regex.test(name) && !name.includes('..');
+  const btn = document.getElementById('s3-btn-confirm-create');
+  const hint = document.getElementById('s3-bucket-hint');
+
+  btn.disabled = !isValid;
+  hint.className = isValid ? "mt-2 text-[9px] text-emerald-500"
+      : "mt-2 text-[9px] text-red-500";
+}
+
+function s3OpenCreateBucketModal() {
+  console.log('s3OpenCreateBucketModal');
+  document.getElementById('s3-create-bucket-modal').classList.remove('hidden');
+  document.getElementById('s3-new-bucket-name').value = "";
+  s3ValidateBucketName("");
+}
+
+function s3CloseCreateBucketModal() {
+  document.getElementById('s3-create-bucket-modal').classList.add('hidden');
+}
+
+async function s3PerformCreateBucket() {
+  const name = document.getElementById('s3-new-bucket-name').value;
+  const res = await fetch(`/dashboard/api/s3/create-bucket?name=${name}`,
+      {method: 'POST'});
+  if (res.ok) {
+    s3CloseCreateBucketModal();
+    await s3LoadBuckets();
+  }
+}
+
+async function s3EmptyBucket() {
+  if (!confirm(
+      `Are you sure you want to DELETE ALL objects in "${s3CurrentBucket}"?`)) {
+    return;
+  }
+
+  // 1. Fetch all objects
+  const res = await fetch(
+      `/dashboard/api/s3/list-objects?bucket=${s3CurrentBucket}`);
+  const data = await res.json();
+
+  if (!data.Contents || data.Contents.length === 0) {
+    alert("Bucket is already empty.");
+    return;
+  }
+
+  // 2. Delete each object
+  // In a production app, you'd use DeleteObjects (plural) API,
+  // but for local dev, iterating is fine and shows progress.
+  for (const obj of data.Contents) {
+    await fetch(
+        `/dashboard/api/s3/delete?bucket=${s3CurrentBucket}&key=${encodeURIComponent(
+            obj.Key)}`, {
+          method: 'POST'
+        });
+  }
+
+  alert(`Emptied ${data.Contents.length} objects.`);
+  await s3SelectBucket(s3CurrentBucket, s3CurrentBucketPath); // Refresh view
+}
+
+async function s3DeleteBucket(name) {
+  if (!confirm(
+      `Delete bucket "${name}"? Note: Bucket must be empty first.`)) {
+    return;
+  }
+
+  const res = await fetch(
+      `/dashboard/api/s3/delete-bucket?name=${encodeURIComponent(name)}`,
+      {method: 'POST'});
+  if (res.ok) {
+    if (s3CurrentBucket === name) {
+      document.getElementById('s3-workspace').classList.add('hidden');
+      s3CurrentBucket = "";
+    }
+    await s3LoadBuckets();
+  } else {
+    const err = await res.json();
+    alert(`Error: ${err.Message || "Bucket might not be empty"}`);
+  }
+}
+
+async function s3SelectBucket(name, path) {
   s3CurrentBucket = name;
+  s3CurrentBucketPath = path;
   document.getElementById('s3-active-bucket-name').innerText = name;
+  document.getElementById('s3-active-bucket-path').innerText = path;
   document.getElementById('s3-workspace').classList.remove('hidden');
 
   const res = await fetch(`/dashboard/api/s3/list-objects?bucket=${name}`);
@@ -772,10 +935,9 @@ async function s3SelectBucket(name) {
                 ${obj.Key}
             </button>
         </td>
-        <td class="p-3 text-gray-500 font-mono">${(obj.Size / 1024).toFixed(2)} KB</td>
+        <td class="p-3 text-gray-400 font-mono">${(obj.Size / 1024).toFixed(2)} KB</td>
         <td class="p-3 text-right">
-            <button onclick="s3DeleteObject('${safeKey}')" 
-                    class="text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+            <button onclick="s3DeleteObject('${safeKey}')" class="text-red-500 hover:text-red-400 p-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                 </svg>
@@ -821,7 +983,7 @@ async function s3PerformUpload() {
 
     s3CloseUploadModal();
 
-    await s3SelectBucket(s3CurrentBucket); // Refresh the list
+    await s3SelectBucket(s3CurrentBucket, s3CurrentBucketPath); // Refresh the list
 
   } catch (err) {
     alert(err.message);
@@ -829,18 +991,22 @@ async function s3PerformUpload() {
 }
 
 async function s3DeleteObject(key) {
-  if (!confirm(`Delete ${key} from ${s3CurrentBucket}?`)) return;
+  if (!confirm(`Delete ${key} from ${s3CurrentBucket}?`)) {
+    return;
+  }
 
   try {
-    const res = await fetch(`/dashboard/api/s3/delete?bucket=${s3CurrentBucket}&key=${encodeURIComponent(key)}`, {
-      method: 'POST'
-    });
+    const res = await fetch(
+        `/dashboard/api/s3/delete?bucket=${s3CurrentBucket}&key=${encodeURIComponent(
+            key)}`, {
+          method: 'POST'
+        });
 
     if (!res.ok) {
       throw new Error("Delete failed");
     }
 
-    await s3SelectBucket(s3CurrentBucket); // Refresh the list
+    await s3SelectBucket(s3CurrentBucket, s3CurrentBucketPath); // Refresh the list
 
   } catch (err) {
     alert(err.message);
@@ -850,7 +1016,9 @@ async function s3DeleteObject(key) {
 async function s3ViewObject(key) {
   // In a real AWS environment, you'd use a Presigned URL.
   // Locally, we can just fetch the object data.
-  const res = await fetch(`/dashboard/api/s3/get-object?bucket=${s3CurrentBucket}&key=${encodeURIComponent(key)}`);
+  const res = await fetch(
+      `/dashboard/api/s3/get-object?bucket=${s3CurrentBucket}&key=${encodeURIComponent(
+          key)}`);
   const data = await res.json();
 
   // Decode from base64 (AWS returns Body as base64 in many JSON proxies)
@@ -864,7 +1032,8 @@ let eventSource = null;
 
 async function showView(viewId) {
   // Hide all views
-  document.querySelectorAll('.view-container').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.view-container').forEach(
+      el => el.classList.add('hidden'));
   // Show selected view
   if (viewId !== 'dynamodb') {
     document.getElementById('ddb-auto-refresh-check').checked = false;
@@ -918,37 +1087,39 @@ async function fetchOverviewData() {
     const serviceList = document.getElementById('service-list');
     serviceList.innerHTML = data.services.map(s => `
                     <div class="flex items-center justify-between group">
-                        <span class="text-sm font-medium ${s.healthy ? 'text-slate-200' : 'text-gray-600'}">${s.name}</span>
+                        <span class="text-sm font-medium ${s.healthy
+        ? 'text-slate-200' : 'text-gray-600'}">${s.name}</span>
                         <div class="flex items-center gap-2">
-                            <div class="w-2 h-2 rounded-full ${s.healthy ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500 status-pulse'}"></div>
+                            <div class="w-2 h-2 rounded-full ${s.healthy
+        ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500 status-pulse'}"></div>
                         </div>
                     </div>
                 `).join('');
 
     // 2. Update Storage Grid
-/*
-    const storageGrid = document.getElementById('storage-grid');
-    storageGrid.innerHTML = Object.entries(data.storage).map(([svc, size]) => `
-                    <div class="bg-stone-900 border border-stone-800 p-4 rounded-2xl hover:border-stone-700 transition-colors">
-                        <div class="text-xs font-bold text-gray-400 uppercase tracking-tighter">${svc}</div>
-                        <div class="text-2xl font-black text-white mt-2">${size}</div>
-                    </div>
-                `).join('');
-*/
+    /*
+        const storageGrid = document.getElementById('storage-grid');
+        storageGrid.innerHTML = Object.entries(data.storage).map(([svc, size]) => `
+                        <div class="bg-stone-900 border border-stone-800 p-4 rounded-2xl hover:border-stone-700 transition-colors">
+                            <div class="text-xs font-bold text-gray-400 uppercase tracking-tighter">${svc}</div>
+                            <div class="text-2xl font-black text-white mt-2">${size}</div>
+                        </div>
+                    `).join('');
+    */
 
     document.getElementById('vol-path').innerText = data.volume_path;
 
-/*
-    if (data.buckets !== undefined) {
-      const s3Container = document.getElementById('s3-actions');
-      s3Container.innerHTML = data.buckets.map(b => `
-        <div class="flex items-center justify-between p-2 hover:bg-stone-800 rounded-lg transition-colors">
-            <span class="text-sm font-mono">${b}</span>
-            <button onclick="triggerAction('clear_s3', 's3', '${b}')" class="text-xs bg-red-900/40 text-red-400 px-3 py-1 rounded-md border border-red-500/30 hover:bg-red-500 hover:text-white transition-all">Clear</button>
-        </div>
-      `).join('');
-    }
-*/
+    /*
+        if (data.buckets !== undefined) {
+          const s3Container = document.getElementById('s3-actions');
+          s3Container.innerHTML = data.buckets.map(b => `
+            <div class="flex items-center justify-between p-2 hover:bg-stone-800 rounded-lg transition-colors">
+                <span class="text-sm font-mono">${b}</span>
+                <button onclick="triggerAction('clear_s3', 's3', '${b}')" class="text-xs bg-red-900/40 text-red-400 px-3 py-1 rounded-md border border-red-500/30 hover:bg-red-500 hover:text-white transition-all">Clear</button>
+            </div>
+          `).join('');
+        }
+    */
 
   } catch (err) {
     console.error("Dashboard sync error:", err);
@@ -999,13 +1170,15 @@ function switchLog() {
   const consoleEl = document.getElementById('log-console');
 
   // Close existing stream
-  if (eventSource) eventSource.close();
+  if (eventSource) {
+    eventSource.close();
+  }
   consoleEl.innerHTML = `<div class="text-blue-400 font-bold pb-1">[SYSTEM] Switched to ${service} logs...</div>`;
 
   // Start new SSE connection
   eventSource = new EventSource(`/dashboard/api/logs?service=${service}`);
 
-  eventSource.onmessage = function(event) {
+  eventSource.onmessage = function (event) {
     const line = document.createElement('div');
     // line.className = "border-b border-stone-900 py-1";
     line.className = "pb-1";
@@ -1016,7 +1189,7 @@ function switchLog() {
     consoleEl.scrollTop = consoleEl.scrollHeight;
   };
 
-  eventSource.onerror = function() {
+  eventSource.onerror = function () {
     console.error("Log stream lost. Reconnecting...");
   };
 }

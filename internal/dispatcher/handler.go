@@ -108,7 +108,7 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if d.S3Svc != nil && amzTarget == "" && isS3Request(r) {
+	if d.S3Svc != nil && isS3Request(r) {
 
 		d.S3Svc.Handle(w, r, amzTarget)
 		return
@@ -143,7 +143,11 @@ func (d *Dispatcher) HandleDashboardAPI(w http.ResponseWriter, r *http.Request) 
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		err := json.NewEncoder(w).Encode(resp)
+		if err != nil {
+			log.Fatalf("Error encoding JSON: %v", err)
+			return
+		}
 
 		return
 	}
