@@ -37,7 +37,7 @@ func GetServiceInstance() CwService {
 			log.Fatalf("Critical: Could not create CloudWatch directory: %v", err)
 		}
 
-		instance := &cloudwatchImplementation{
+		instance = &cloudwatchImplementation{
 			Groups:      make(map[string]map[string]*LogStream),
 			storagePath: path,
 		}
@@ -65,6 +65,8 @@ func (s *cloudwatchImplementation) load() {
 	var state persistentState
 	if err := utils.UnmarshalJsonErrors(data, &state); err == nil {
 		s.Groups = state.Groups
+	} else {
+		log.Fatalf("Error loading CloudWatch state: %s", err)
 	}
 }
 

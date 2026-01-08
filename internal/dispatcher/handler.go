@@ -12,6 +12,7 @@ import (
 )
 
 func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	d.CwSvc.Debug(SERVICE, "ServeHTTP", fmt.Sprintf("%s - %s", r.Method, r.URL))
 
 	if r.Method == "GET" && r.URL.Path == "/dashboard" && utils.DashboardEnabled {
 		http.Redirect(w, r, "/dashboard/", http.StatusFound)
