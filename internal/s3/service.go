@@ -1,11 +1,11 @@
 package s3
 
 import (
+	"cloudlocal/internal/cloudwatch"
 	"cloudlocal/internal/utils"
 	"encoding/xml"
 	"fmt"
 	"io"
-	"log"
 	"maps"
 	"net/http"
 	"os"
@@ -26,11 +26,13 @@ type ServiceHandler interface {
 }
 
 func NewS3Service() ServiceHandler {
-	var s3Enabled = utils.IsServiceEnabled("s3")
+	cw := cloudwatch.GetServiceInstance()
+	var s3Enabled = utils.IsServiceEnabled(S3)
 
 	if s3Enabled {
 		return &s3ServiceImplementation{
-			s3: newS3Service(),
+			cloudwatch: cw,
+			s3:         newS3Service(cw),
 		}
 	}
 	return nil
@@ -38,7 +40,7 @@ func NewS3Service() ServiceHandler {
 
 func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Request, target string) {
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	log.Printf("%v", target)
+	svc.cloudwatch.Info(SERVICE, "HttpHandler", fmt.Sprintf("S3 amz-target: %v", target))
 	queryParams := r.URL.Query()
 	if len(parts) == 0 || parts[0] == "" {
 		// List Buckets (GET /)
@@ -118,7 +120,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 		defer data.Close()
 		_, err = io.Copy(w, data) // Stream file back to user
 		if err != nil {
-			log.Fatalf("Error copying data: %v", err)
+			cloudwatch.GetServiceInstance().Error(SERVICE, "GetObjectResponse", fmt.Sprintf("Error parsing response data: %v", err))
 			return
 		}
 	case http.MethodDelete:
@@ -245,14 +247,15 @@ type internalS3Service interface {
 	clearBucket(bucketName string) error
 }
 
-func newS3Service() internalS3Service {
-	s3Dir := filepath.Join(utils.VolumeDir, "s3")
+func newS3Service(cw cloudwatch.CwService) internalS3Service {
+	s3Dir := filepath.Join(utils.VolumeDir, S3)
 
 	if err := os.MkdirAll(s3Dir, 0755); err != nil {
-		log.Fatalf("Critical: Could not create S3 directory: %v", err)
+		cw.Error(SERVICE, "Config", fmt.Sprintf("Could not create S3 directory: %v", err))
 	}
 
 	svc := &s3Implementation{
+		cloudwatch:    cw,
 		storagePath:   s3Dir,
 		region:        utils.AwsRegion,
 		activeUploads: make(map[string]*MultipartUpload),
@@ -285,19 +288,21 @@ func (s *s3Implementation) load() {
 func (s *s3Implementation) createBucket(name string) error {
 	bucketPath := filepath.Join(s.storagePath, name)
 	if !utils.IsFileExists(bucketPath) {
-		log.Printf("Creating S3 bucket:\n%s\n\n", name)
 		s.buckets[name] = &Bucket{
 			Name:         name,
 			CreationDate: time.Now(),
 			Path:         bucketPath,
 		}
+		s.cloudwatch.Info(SERVICE, "CreateBucket", fmt.Sprintf("Creating S3 bucket: %s", utils.MarshalIjson(s.buckets[name])))
 	}
 	return os.MkdirAll(bucketPath, 0755)
 }
 
 func (s *s3Implementation) deleteBucket(name string) error {
 	bucketPath := filepath.Join(s.storagePath, name)
-	log.Printf("Deleting S3 bucket:\n%s\n\n", name)
+
+	s.cloudwatch.Info(SERVICE, "DeleteBucket", fmt.Sprintf("Deleting S3 bucket: %s", utils.MarshalIjson(s.buckets[name])))
+
 	delete(s.buckets, name)
 	return os.RemoveAll(bucketPath)
 }
@@ -307,7 +312,7 @@ func (s *s3Implementation) listBuckets() ListBucketsResponse {
 		//Xmlns: "http://s3.amazonaws.com/doc/2006-03-01/",
 		Owner: Owner{ID: utils.S3OwnerId, DisplayName: "cloudlocal"},
 	}
-	log.Printf("\n\nBefore list S3 buckets:\n%s\n\n", utils.MarshalIjson(s.buckets))
+	s.cloudwatch.Info(SERVICE, "ListBuckets", fmt.Sprintf("Before list S3 buckets: %s", utils.MarshalIjson(s.buckets)))
 
 	values := make([]Bucket, 0, len(s.buckets))
 	for e := range maps.Values(s.buckets) {
@@ -317,7 +322,7 @@ func (s *s3Implementation) listBuckets() ListBucketsResponse {
 	}
 	resp.Buckets = values
 
-	log.Printf("Listing S3 buckets:\n%s\n\n", utils.MarshalIjson(resp))
+	s.cloudwatch.Info(SERVICE, "ListBuckets", fmt.Sprintf("List S3 buckets: %s", utils.MarshalIjson(resp)))
 	return resp
 }
 
@@ -334,13 +339,13 @@ func (s *s3Implementation) putObject(bucket, key string, data io.Reader) error {
 	defer file.Close()
 
 	_, err = io.Copy(file, data)
-	log.Printf("Putting object to S3:\nbucket: %s, key: %s\n\n", bucket, key)
+	s.cloudwatch.Info(SERVICE, "PutObject", fmt.Sprintf("Putting object to S3 bucket: %s, key: %s", bucket, key))
 	return err
 }
 
 func (s *s3Implementation) getObject(bucket, key string) (io.ReadCloser, error) {
 	filePath := filepath.Join(s.storagePath, bucket, key)
-	log.Printf("Getting object from S3:\nbucket: %s, key: %s\n\n", bucket, key)
+	s.cloudwatch.Info(SERVICE, "GetObject", fmt.Sprintf("Getting object from S3 bucket: %s, key: %s", bucket, key))
 	return os.Open(filePath)
 }
 
@@ -377,14 +382,14 @@ func (s *s3Implementation) listObjectsV2(bucket, prefix string) (ListObjectsV2Re
 	})
 
 	resp.KeyCount = len(resp.Contents)
-	log.Printf("Listing objects in bucket:\n%s\n\n", utils.MarshalIjson(resp))
+	s.cloudwatch.Info(SERVICE, "ListObjects", fmt.Sprintf("Listing objects in bucket: %s", utils.MarshalIjson(resp)))
 	return resp, err
 }
 
 func (s *s3Implementation) deleteObject(bucket, key string) error {
 	filePath := filepath.Join(s.storagePath, bucket, key)
 	// S3 returns success even if the file doesn't exist
-	log.Printf("Deleting object from S3:\nbucket: %s, key: %s\n\n", bucket, key)
+	s.cloudwatch.Info(SERVICE, "DeleteObject", fmt.Sprintf("Deleting object from S3 bucket: %s, key: %s", bucket, key))
 	return os.Remove(filePath)
 }
 
@@ -395,7 +400,7 @@ func (s *s3Implementation) deleteObjects(bucket string, keys []string) ([]string
 		_ = os.Remove(filePath)
 		deleted = append(deleted, key)
 	}
-	log.Printf("Deleting multiple objects from S3:\nbucket: %s, keys: %v\n\n", bucket, keys)
+	s.cloudwatch.Info(SERVICE, "DeleteObjects", fmt.Sprintf("Deleting multiple objects from S3 bucket: %s, keys: %v", bucket, keys))
 	return deleted, nil
 }
 
@@ -403,6 +408,7 @@ func (s *s3Implementation) initMultipartUpload(bucket, key, uploadID string) err
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.cloudwatch.Info(SERVICE, "MultipartUploadInit", fmt.Sprintf("Multipart upload init S3 bucket: %s, key: %s, uploadId: %s", bucket, key, uploadID))
 	// Create a temporary hidden directory for this specific upload
 	uploadDir := filepath.Join(s.storagePath, ".uploads", uploadID)
 	err := os.MkdirAll(uploadDir, 0755)
@@ -419,6 +425,8 @@ func (s *s3Implementation) initMultipartUpload(bucket, key, uploadID string) err
 }
 
 func (s *s3Implementation) uploadPart(uploadID string, partNum int, data io.Reader) (string, error) {
+
+	s.cloudwatch.Info(SERVICE, "MultipartUploadPart", fmt.Sprintf("Multipart upload S3 uploadId: %s, partNum: %d", uploadID, partNum))
 	// 1. Define where this specific part will live
 	uploadDir := filepath.Join(s.storagePath, ".uploads", uploadID)
 	partPath := filepath.Join(uploadDir, fmt.Sprintf("part-%d", partNum))
@@ -443,6 +451,7 @@ func (s *s3Implementation) uploadPart(uploadID string, partNum int, data io.Read
 		upload.Parts[partNum] = etag
 	}
 	s.mu.Unlock()
+	s.cloudwatch.Info(SERVICE, "MultipartUploadPart", fmt.Sprintf("Multipart upload S3 uploadId: %s, partNum: %d, etag: %s", uploadID, partNum, etag))
 
 	return etag, nil
 }
@@ -451,6 +460,7 @@ func (s *s3Implementation) completeMultipartUpload(bucket, key, uploadID string,
 	// 1. Decode the request to get the part list
 	var req CompleteMultipartUploadRequest
 	if err := xml.NewDecoder(body).Decode(&req); err != nil {
+		s.cloudwatch.Error(SERVICE, "MultipartUploadComplete", fmt.Sprintf("Body decode error. S3 bucket: %s, key: %s, uploadId: %s, error: %s", bucket, key, uploadID, err.Error()))
 		return CompleteMultipartUploadResult{}, err
 	}
 
@@ -482,19 +492,27 @@ func (s *s3Implementation) completeMultipartUpload(bucket, key, uploadID string,
 	}
 
 	// 5. Cleanup the temporary upload directory
-	os.RemoveAll(uploadDir)
+	err = os.RemoveAll(uploadDir)
+	if err != nil {
+		s.cloudwatch.Error(SERVICE, "MultipartUploadComplete", fmt.Sprintf("Temp directory cleanup error. S3 bucket: %s, key: %s, uploadId: %s, error: %s", bucket, key, uploadID, err.Error()))
+		return CompleteMultipartUploadResult{}, err
+	}
 
-	return CompleteMultipartUploadResult{
+	resp := CompleteMultipartUploadResult{
 		Location: fmt.Sprintf("http://localhost:10050/%s/%s", bucket, key),
 		Bucket:   bucket,
 		Key:      key,
 		ETag:     fmt.Sprintf("\"merged-%s\"", uploadID),
-	}, nil
+	}
+	s.cloudwatch.Info(SERVICE, "MultipartUploadComplete", fmt.Sprintf("Multipart upload complete S3 bucket: %s, key: %s, uploadId: %s, result: %s", bucket, key, uploadID, utils.MarshalIjson(resp)))
+
+	return resp, nil
 }
 
 func (s *s3Implementation) clearBucket(bucketName string) error {
 	bucketPath := filepath.Join(s.storagePath, bucketName)
 
+	s.cloudwatch.Info(SERVICE, "ClearBucket", fmt.Sprintf("Cleaning S3 bucket: %s, path: %s", bucketName, bucketPath))
 	// Read all files/folders inside the bucket
 	files, err := os.ReadDir(bucketPath)
 	if err != nil {

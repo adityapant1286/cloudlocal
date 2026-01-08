@@ -1,10 +1,10 @@
 package sns
 
 import (
+	"cloudlocal/internal/cloudwatch"
 	"cloudlocal/internal/sqs"
 	"cloudlocal/internal/utils"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -15,11 +15,12 @@ type ServiceHandler interface {
 }
 
 func NewSnsService(sqsSvc sqs.ServiceHandler) ServiceHandler {
-	var snsEnabled = utils.IsServiceEnabled("sns")
+	cw := cloudwatch.GetServiceInstance()
+	var snsEnabled = utils.IsServiceEnabled(SNS)
 
 	if snsEnabled {
 		return &snsServiceImplementation{
-			sns: newSns(sqsSvc),
+			sns: newSns(cw, sqsSvc),
 		}
 	}
 	return nil
@@ -74,9 +75,10 @@ type internalSns interface {
 	listTopics() []TopicEntry
 }
 
-func newSns(sqsSvc sqs.ServiceHandler) internalSns {
+func newSns(cw cloudwatch.CwService, sqsSvc sqs.ServiceHandler) internalSns {
 
 	return &snsImplementation{
+		cloudwatch:    cw,
 		topics:        make(map[string]bool),
 		subscriptions: make(map[string][]string),
 		sqsSvc:        sqsSvc,
@@ -88,10 +90,12 @@ func (s *snsImplementation) createTopic(name string) CreateTopicResponse {
 	defer s.mu.Unlock()
 	arn := fmt.Sprintf("arn:aws:sns:%s:%s:%s", utils.AwsRegion, utils.AccountId, name)
 	s.topics[arn] = true
-	return CreateTopicResponse{
+	resp := CreateTopicResponse{
 		TopicArn:  arn,
 		RequestID: utils.RandomUuid(),
 	}
+	s.cloudwatch.Info(SERVICE, "CreateTopic", fmt.Sprintf("SNS Topic created. Name: %s", utils.MarshalIjson(resp)))
+	return resp
 }
 
 func (s *snsImplementation) subscribe(topicArn string, endpoint string) string {
@@ -99,7 +103,10 @@ func (s *snsImplementation) subscribe(topicArn string, endpoint string) string {
 	defer s.mu.Unlock()
 	s.subscriptions[topicArn] = append(s.subscriptions[topicArn], endpoint)
 	epochMillis := time.Now().UnixMilli()
-	return fmt.Sprintf("arn:aws:sns:%s:%s:%s:sub-%d", utils.AwsRegion, utils.AccountId, topicArn, epochMillis)
+	arn := fmt.Sprintf("arn:aws:sns:%s:%s:%s:sub-%d", utils.AwsRegion, utils.AccountId, topicArn, epochMillis)
+
+	s.cloudwatch.Info(SERVICE, "Subscribe", fmt.Sprintf("SNS subscribe Topic ARN: %s, endpoint: %s, subscription ARN: %s", topicArn, endpoint, arn))
+	return arn
 }
 
 func (s *snsImplementation) publish(topicArn string, message string) string {
@@ -111,10 +118,13 @@ func (s *snsImplementation) publish(topicArn string, message string) string {
 		// Directly inject into our SQS service
 		_, err := s.sqsSvc.SendMessage(queueUrl, message)
 		if err != nil {
-			log.Fatalf("Error publishing to SQS queue %s: %s", queueUrl, err.Error())
+			s.cloudwatch.Error(SERVICE, "Publish", fmt.Sprintf("SNS publish error. Topic ARN: %s, endpoint: %s, error: %s", topicArn, queueUrl, err.Error()))
 		}
 	}
-	return utils.RandomUuid()
+
+	uuid := utils.RandomUuid()
+	s.cloudwatch.Info(SERVICE, "Publish", fmt.Sprintf("SNS publish complete. Topic ARN: %s, publish id: %s", topicArn, uuid))
+	return uuid
 }
 
 func (s *snsImplementation) listTopics() []TopicEntry {
@@ -126,5 +136,6 @@ func (s *snsImplementation) listTopics() []TopicEntry {
 			TopicArn: arn,
 		})
 	}
+	s.cloudwatch.Info(SERVICE, "ListTopics", fmt.Sprintf("SNS Listing topics Topic ARNs: %s", utils.MarshalIjson(topicArns)))
 	return topicArns
 }

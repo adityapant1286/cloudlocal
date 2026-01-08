@@ -1,5 +1,7 @@
 package servicediscovery
 
+const SERVICE = "discovery-service"
+
 type ServiceStatus struct {
 	Name    string `json:"name"`
 	Status  string `json:"status"`

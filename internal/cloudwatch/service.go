@@ -8,40 +8,42 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 )
 
-//func NewCloudwatchService() utils.ServiceHandler {
-//	return &cloudwatchServiceImplementation{
-//		cloudwatch: newCloudwatch(),
-//	}
-//}
-//
-//func (svc *cloudwatchServiceImplementation) Handle(w http.ResponseWriter, r *http.Request, target string) {
-//}
+var (
+	once     sync.Once
+	instance *cloudwatchImplementation
+)
 
 type CwService interface {
 	AddLog(group, stream, message string)
+	Debug(group, stream, message string)
+	Error(group, stream, message string)
+	Info(group, stream, message string)
+	Warn(group, stream, message string)
 	ListGroupNames() []LogGroupRes
 	ListLogStreamsNames(group string) []LogStreamRes
 	ListEvents(group, stream string) []LogEvent
 }
 
-func NewCloudWatchService() CwService {
+func GetServiceInstance() CwService {
+	once.Do(func() {
+		cloudwatchDir := filepath.Join(utils.VolumeDir, "cloudwatch")
+		path := filepath.Join(cloudwatchDir, "cloudwatch_state.json")
 
-	cloudwatchDir := filepath.Join(utils.VolumeDir, "cloudwatch")
-	path := filepath.Join(cloudwatchDir, "cloudwatch_state.json")
+		if err := os.MkdirAll(cloudwatchDir, 0755); err != nil {
+			log.Fatalf("Critical: Could not create CloudWatch directory: %v", err)
+		}
 
-	if err := os.MkdirAll(cloudwatchDir, 0755); err != nil {
-		log.Fatalf("Critical: Could not create CloudWatch directory: %v", err)
-	}
-
-	svc := &cloudwatchImplementation{
-		Groups:      make(map[string]map[string]*LogStream),
-		storagePath: path,
-	}
-	svc.load()
-	return svc
+		instance := &cloudwatchImplementation{
+			Groups:      make(map[string]map[string]*LogStream),
+			storagePath: path,
+		}
+		instance.load()
+	})
+	return instance
 }
 
 func (s *cloudwatchImplementation) save() {
@@ -64,6 +66,22 @@ func (s *cloudwatchImplementation) load() {
 	if err := utils.UnmarshalJsonErrors(data, &state); err == nil {
 		s.Groups = state.Groups
 	}
+}
+
+func (s *cloudwatchImplementation) Debug(group, stream, message string) {
+	s.AddLog(group, stream, "[DEBUG] "+message)
+}
+
+func (s *cloudwatchImplementation) Error(group, stream, message string) {
+	s.AddLog(group, stream, "[ERROR] "+message)
+}
+
+func (s *cloudwatchImplementation) Info(group, stream, message string) {
+	s.AddLog(group, stream, "[INFO] "+message)
+}
+
+func (s *cloudwatchImplementation) Warn(group, stream, message string) {
+	s.AddLog(group, stream, "[WARN] "+message)
 }
 
 func (s *cloudwatchImplementation) AddLog(group, stream, message string) {

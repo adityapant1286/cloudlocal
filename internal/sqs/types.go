@@ -1,16 +1,22 @@
 package sqs
 
 import (
+	"cloudlocal/internal/cloudwatch"
 	"sync"
 	"time"
 )
 
+const SQS = "sqs"
+const SERVICE = SQS + "-service"
+
 type sqsImplementation struct {
-	sqs internalSqsService
+	cloudwatch cloudwatch.CwService
+	sqs        internalSqsService
 }
 
 type sqsQueueImplementation struct {
-	mu sync.RWMutex
+	mu         sync.RWMutex
+	cloudwatch cloudwatch.CwService
 	//Arn    string
 	queues map[string]*Queue
 }

@@ -1,12 +1,12 @@
 package secretsmanager
 
 import (
+	"cloudlocal/internal/cloudwatch"
 	"cloudlocal/internal/utils"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"maps"
 	"net/http"
 	"os"
@@ -17,11 +17,12 @@ import (
 )
 
 func NewSecretManagerService() utils.ServiceHandler {
-	var smEnabled = utils.IsServiceEnabled("secretsmanager")
+	cw := cloudwatch.GetServiceInstance()
+	var smEnabled = utils.IsServiceEnabled(SECRETS_MANAGER)
 
 	if smEnabled {
 		return &smImplementation{
-			sm: newSecretsService(),
+			sm: newSecretsService(cw),
 		}
 	}
 	return nil
@@ -148,14 +149,15 @@ type internalSecretsService interface {
 	listSecrets(filters []Filter, sortBy, sortOrder string) ([]Secret, error)
 }
 
-func newSecretsService() internalSecretsService {
+func newSecretsService(cw cloudwatch.CwService) internalSecretsService {
 	smDir := filepath.Join(utils.VolumeDir, "secrets")
 	path := filepath.Join(smDir, "secrets_state.json")
 	if err := os.MkdirAll(smDir, 0755); err != nil {
-		log.Fatalf("Critical: Could not create secrets directory: %v", err)
+		cw.Error(SERVICE, "Config", fmt.Sprintf("Could not create secrets directory: %v", err))
 	}
 
 	svc := &secretsImplementation{
+		cloudwatch:  cw,
 		store:       make(map[string]*Secret),
 		storagePath: path,
 	}
@@ -167,7 +169,7 @@ func (s *secretsImplementation) save() {
 	data, _ := json.MarshalIndent(s.store, "", "  ")
 	err := os.WriteFile(s.storagePath, data, 0644)
 	if err != nil {
-		log.Printf("Error saving KMS state: %s", err)
+		s.cloudwatch.Error(SERVICE, "Config", fmt.Sprintf("Error saving KMS state: %s", err.Error()))
 	}
 }
 
@@ -209,7 +211,7 @@ func (s *secretsImplementation) createSecret(name, desc, value string) (*Secret,
 		LastChanged: secret.LastChanged,
 		Tags:        secret.Tags,
 	}
-	log.Printf("Created secret:\n%s\n\n", utils.MarshalIjson(sc))
+	s.cloudwatch.Info(SERVICE, "CreateSecret", fmt.Sprintf("Created secret: %s", utils.MarshalIjson(sc)))
 
 	return sc, nil
 }
@@ -222,7 +224,8 @@ func (s *secretsImplementation) getSecretValue(name string) (*Secret, error) {
 	if !ok {
 		return nil, errors.New("ResourceNotFoundException")
 	}
-	log.Printf("Retrieved secret:\n%s\n\n", utils.MarshalIjson(val))
+
+	s.cloudwatch.Info(SERVICE, "GetSecretValue", fmt.Sprintf("Retrieved secret: %s", utils.MarshalIjson(val)))
 	return val, nil
 }
 
@@ -239,7 +242,7 @@ func (s *secretsImplementation) updateSecret(name, value string) error {
 	secret.LastChanged = time.Now().Unix()
 
 	s.save()
-	log.Printf("Updated secret:\n%s\n\n", name)
+	s.cloudwatch.Info(SERVICE, "UpdateSecret", fmt.Sprintf("Updated secret: %s", name))
 	return nil
 }
 
@@ -253,7 +256,7 @@ func (s *secretsImplementation) deleteSecret(name string) error {
 
 	delete(s.store, name)
 	s.save()
-	log.Printf("Deleted secret:\n%s\n\n", name)
+	s.cloudwatch.Info(SERVICE, "DeleteSecret", fmt.Sprintf("Deleted secret: %s", name))
 	return nil
 }
 
@@ -274,7 +277,7 @@ func (s *secretsImplementation) describeSecret(name string) (*Secret, error) {
 		LastChanged: secret.LastChanged,
 		Tags:        secret.Tags,
 	}
-	log.Printf("Retrieved secret:\n%s\n\n", utils.MarshalIjson(sc))
+	s.cloudwatch.Info(SERVICE, "DescribeSecret", fmt.Sprintf("Retrieved secret: %s", utils.MarshalIjson(sc)))
 
 	return sc, nil
 }
@@ -287,7 +290,7 @@ func (s *secretsImplementation) listSecrets(filters []Filter, sortBy, sortOrder 
 	filtered := filterSecrets(filters, secrets)
 	filtered = utils.SortArr(filtered, secretSortFunc(sortBy, sortOrder))
 
-	log.Printf("Retrieved secrets:\n%s\n\n", utils.MarshalIjson(filtered))
+	s.cloudwatch.Info(SERVICE, "ListSecrets", fmt.Sprintf("List secrets: %s", utils.MarshalIjson(filtered)))
 
 	return filtered, nil
 }

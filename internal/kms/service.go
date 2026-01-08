@@ -1,6 +1,7 @@
 package kms
 
 import (
+	"cloudlocal/internal/cloudwatch"
 	"cloudlocal/internal/utils"
 	"crypto/aes"
 	"crypto/cipher"
@@ -10,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -19,11 +19,12 @@ import (
 )
 
 func NewKmsService() utils.ServiceHandler {
-	var kmsEnabled = utils.IsServiceEnabled("kms")
+	cw := cloudwatch.GetServiceInstance()
+	var kmsEnabled = utils.IsServiceEnabled(KMS)
 
 	if kmsEnabled {
 		return &kmsServiceImplementation{
-			kms: newKms(),
+			kms: newKms(cw),
 		}
 	}
 	return nil
@@ -111,17 +112,19 @@ type internalKms interface {
 	resolveKeyId(idOrAlias string) string
 }
 
-func newKms() internalKms {
+func newKms(cw cloudwatch.CwService) internalKms {
+
 	secret := utils.GetEnv("MASTER_SECRET", "cloudlocal-secret-32-chars-long!")
 
-	kmsDir := filepath.Join(utils.VolumeDir, "kms")
+	kmsDir := filepath.Join(utils.VolumeDir, KMS)
 	path := filepath.Join(kmsDir, "kms_state.json")
 
 	if err := os.MkdirAll(kmsDir, 0755); err != nil {
-		log.Fatalf("Critical: Could not create KMS directory: %v", err)
+		cw.Error(SERVICE, "Config", fmt.Sprintf("Could not create KMS directory: %v", err))
 	}
 
 	svc := &kmsImplementation{
+		cloudwatch:   cw,
 		keys:         make(map[string]*KmsKey),
 		aliases:      make(map[string]string),
 		masterSecret: []byte(secret[:32]), // 32 bytes for AES-256
@@ -140,7 +143,7 @@ func (s *kmsImplementation) save() {
 	data, _ := json.MarshalIndent(state, "", "  ")
 	err := os.WriteFile(s.storagePath, data, 0644)
 	if err != nil {
-		log.Printf("Error saving KMS state: %s", err)
+		s.cloudwatch.Error(SERVICE, "KmsConfig", fmt.Sprintf("Error saving KMS state: %s", err))
 	}
 }
 
@@ -169,7 +172,7 @@ func (s *kmsImplementation) createAlias(aliasName string, targetKeyID string) er
 	// targetKeyID could be an ARN or a UUID, so we'd normally resolve it.
 	s.aliases[aliasName] = targetKeyID
 	s.save() // PERSIST
-	log.Printf("Created KMS alias:\n%s\n\n", utils.MarshalIjson(Alias{AliasName: aliasName, TargetKeyId: targetKeyID}))
+	s.cloudwatch.Info(SERVICE, "CreateAlias", fmt.Sprintf("Created KMS alias: %s", utils.MarshalIjson(Alias{AliasName: aliasName, TargetKeyId: targetKeyID})))
 	return nil
 }
 
@@ -192,7 +195,7 @@ func (s *kmsImplementation) createKey(description string) (*KmsKey, error) {
 	}
 	s.keys[keyId] = newKey
 	s.save() // PERSIST
-	log.Printf("Created KMS key:\n%s\n\n", utils.MarshalIjson(newKey))
+	s.cloudwatch.Info(SERVICE, "CreateKey", fmt.Sprintf("Created KMS key: %s", utils.MarshalIjson(newKey)))
 	return newKey, nil
 }
 
@@ -219,7 +222,7 @@ func (s *kmsImplementation) decrypt(blob string) ([]byte, error) {
 
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	result, err := gcm.Open(nil, nonce, ciphertext, nil)
-	log.Printf("Decrypted:\n%s\n\n", string(result))
+	s.cloudwatch.Info(SERVICE, "Decryption", fmt.Sprintf("Decrypted: %s", string(result)))
 	return result, err
 }
 
@@ -236,7 +239,7 @@ func (s *kmsImplementation) describeKey(keyIdOrAlias string) (*KmsKey, error) {
 		return nil, errors.New("NotFoundException: Key not found")
 	}
 
-	log.Printf("Found KMS key:\n%s\n\n", utils.MarshalIjson(key))
+	s.cloudwatch.Info(SERVICE, "DescribeKey", fmt.Sprintf("Found KMS key: %s", utils.MarshalIjson(key)))
 
 	return key, nil
 }
@@ -245,7 +248,9 @@ func (s *kmsImplementation) encrypt(keyId string, plaintext []byte) (string, err
 	if s.keys[keyId] == nil {
 		return "", errors.New("KeyNotFoundException: The specified key does not exist")
 	}
-	log.Printf("Encrypting with KeyID: %s", keyId)
+
+	s.cloudwatch.Info(SERVICE, "Encryption", fmt.Sprintf("Encrypting with KeyID: %s", keyId))
+
 	block, err := aes.NewCipher(s.masterSecret)
 	if err != nil {
 		return "", err
@@ -264,7 +269,8 @@ func (s *kmsImplementation) encrypt(keyId string, plaintext []byte) (string, err
 	// Sealed data: nonce + ciphertext
 	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
 	result := base64.StdEncoding.EncodeToString(ciphertext)
-	log.Printf("Encrypted:\n%s\n", result)
+
+	s.cloudwatch.Info(SERVICE, "Encryption", fmt.Sprintf("Encrypted: %s", result))
 	return result, nil
 }
 
@@ -276,7 +282,7 @@ func (s *kmsImplementation) listAliases() ([]Alias, error) {
 	for name, keyId := range s.aliases {
 		result = append(result, Alias{AliasName: name, TargetKeyId: keyId})
 	}
-	log.Printf("KMS aliases:\n%s\n\n", utils.MarshalIjson(result))
+	s.cloudwatch.Info(SERVICE, "ListAliases", fmt.Sprintf("KMS aliases: %s", utils.MarshalIjson(result)))
 	return result, nil
 }
 
@@ -288,7 +294,7 @@ func (s *kmsImplementation) listKeys() ([]KmsKey, error) {
 	for _, key := range s.keys {
 		result = append(result, *key)
 	}
-	log.Printf("KMS keys:\n%s\n\n", utils.MarshalIjson(result))
+	s.cloudwatch.Info(SERVICE, "ListKeys", fmt.Sprintf("KMS keys: %s", utils.MarshalIjson(result)))
 	return result, nil
 }
 

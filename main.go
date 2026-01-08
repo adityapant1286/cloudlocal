@@ -11,6 +11,7 @@ import (
 	"cloudlocal/internal/sts"
 	"cloudlocal/internal/utils"
 	"embed"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -22,6 +23,7 @@ var uiFiles embed.FS
 
 func main() {
 
+	cw := cloudwatch.GetServiceInstance()
 	sqsService := sqs.NewSQSService()
 
 	appDispatcher := &dispatcher.Dispatcher{
@@ -31,11 +33,12 @@ func main() {
 		S3Svc:  s3.NewS3Service(),
 		SnsSvc: sns.NewSnsService(sqsService),
 		StsSvc: sts.NewStsService(),
-		CwSvc:  cloudwatch.NewCloudWatchService(),
+		CwSvc:  cw,
 		UI:     uiFiles,
 		Proxy:  createDynamoProxy(),
 	}
 
+	cw.Info("CloudLocal", "Startup", fmt.Sprintf("CloudLocal Edge listening on :%s...", utils.Port))
 	log.Printf("CloudLocal Edge listening on :%s...", utils.Port)
 	log.Fatal(http.ListenAndServe(":10050", appDispatcher))
 }

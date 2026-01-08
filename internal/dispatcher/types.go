@@ -12,6 +12,8 @@ import (
 	"net/http"
 )
 
+const SERVICE = "dispatcher-service"
+
 type Dispatcher struct {
 	KmsSvc utils.ServiceHandler
 	SmSvc  utils.ServiceHandler

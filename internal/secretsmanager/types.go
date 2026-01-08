@@ -1,6 +1,12 @@
 package secretsmanager
 
-import "sync"
+import (
+	"cloudlocal/internal/cloudwatch"
+	"sync"
+)
+
+const SECRETS_MANAGER = "secretsmanager"
+const SERVICE = SECRETS_MANAGER + "-service"
 
 type smImplementation struct {
 	sm internalSecretsService
@@ -18,6 +24,7 @@ type Secret struct {
 
 type secretsImplementation struct {
 	mu          sync.RWMutex
+	cloudwatch  cloudwatch.CwService
 	store       map[string]*Secret
 	storagePath string
 }

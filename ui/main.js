@@ -1089,9 +1089,10 @@ async function cwRefreshLogs() {
     const date = new Date(e.timestamp).toISOString();
     let message = e.message;
 
+    message = message.replace(/DEBUG/g, '<span class="text-slate-400 font-bold">DEBUG</span>');
     message = message.replace(/ERROR/g, '<span class="text-red-500 font-bold">ERROR</span>');
-    message = message.replace(/WARN/g, '<span class="text-yellow-500 font-bold">WARN</span>');
     message = message.replace(/INFO/g, '<span class="text-blue-400 font-bold">INFO</span>');
+    message = message.replace(/WARN/g, '<span class="text-yellow-500 font-bold">WARN</span>');
 
     return `
         <div class="py-1 border-b border-gray-900/30 flex gap-4 group hover:bg-white/5 transition-colors">

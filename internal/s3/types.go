@@ -1,12 +1,17 @@
 package s3
 
 import (
+	"cloudlocal/internal/cloudwatch"
 	"sync"
 	"time"
 )
 
+const S3 = "s3"
+const SERVICE = S3 + "-service"
+
 type s3ServiceImplementation struct {
-	s3 internalS3Service
+	cloudwatch cloudwatch.CwService
+	s3         internalS3Service
 }
 
 type Bucket struct {
@@ -108,6 +113,7 @@ type s3Implementation struct {
 	mu            sync.RWMutex
 	storagePath   string
 	region        string
+	cloudwatch    cloudwatch.CwService
 	activeUploads map[string]*MultipartUpload
 	buckets       map[string]*Bucket
 }

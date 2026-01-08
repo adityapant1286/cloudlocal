@@ -1,8 +1,8 @@
 package health
 
 import (
+	"cloudlocal/internal/cloudwatch"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func ProbeInternalServices(enabledServices string) []ServiceStatus {
+func ProbeInternalServices(cw cloudwatch.CwService, enabledServices string) []ServiceStatus {
 	// Simple check if a service name exists in the env string
 	contains := func(s, substr string) bool {
 		return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
@@ -25,7 +25,7 @@ func ProbeInternalServices(enabledServices string) []ServiceStatus {
 		if isAlive {
 			err := conn.Close()
 			if err != nil {
-				log.Printf("Failed to close dynamodb connection: %v", err)
+				cw.Error(SERVICE, "DynamoDb", fmt.Sprintf("Failed to close DynamoDb connection: %v", err.Error()))
 				return nil
 			}
 		}

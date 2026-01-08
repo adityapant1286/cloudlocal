@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -142,7 +141,7 @@ func (d *Dispatcher) HandleDashboard(w http.ResponseWriter, r *http.Request) {
 func (d *Dispatcher) HandleDashboardAPI(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/dashboard/api/status" {
 		resp := CombinedStatus{
-			Services: health.ProbeInternalServices(utils.EnabledServices),
+			Services: health.ProbeInternalServices(d.CwSvc, utils.EnabledServices),
 			Storage:  health.GetStorageStats(utils.VolumeDir),
 			Volume:   utils.VolumeDir,
 		}
@@ -150,7 +149,7 @@ func (d *Dispatcher) HandleDashboardAPI(w http.ResponseWriter, r *http.Request) 
 		w.Header().Set("Content-Type", "application/json")
 		err := json.NewEncoder(w).Encode(resp)
 		if err != nil {
-			log.Fatalf("Error encoding JSON: %v", err)
+			d.CwSvc.Error(SERVICE, "HandleDashboardAPI", fmt.Sprintf("Error encoding JSON: %v", err.Error()))
 			return
 		}
 
@@ -174,14 +173,14 @@ func (d *Dispatcher) HandleDashboardAPI(w http.ResponseWriter, r *http.Request) 
 			err := d.SqsSvc.FlushQueue(req.Target)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				log.Fatalf("Error flushing sqs queue: %s", err.Error())
+				d.CwSvc.Error(SERVICE, "HandleDashboardAPI:flush_sqs", fmt.Sprintf("Error clearing sqs queue: %s", err.Error()))
 				return
 			}
 		case "clear_s3":
 			err := d.S3Svc.ClearBucket(req.Target)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				log.Fatalf("Error clearing s3 bucket: %s", err.Error())
+				d.CwSvc.Error(SERVICE, "HandleDashboardAPI:clear_s3", fmt.Sprintf("Error clearing s3 bucket: %s", err.Error()))
 				return
 			}
 		}
@@ -224,7 +223,7 @@ func (d *Dispatcher) HandleLogStream(w http.ResponseWriter, r *http.Request) {
 			// SSE format requires "data: " prefix and double newline
 			_, err := fmt.Fprintf(w, "data: %s\n\n", line)
 			if err != nil {
-				log.Printf("Error writing data: %s", err.Error())
+				d.CwSvc.Error(SERVICE, "HandleLogStream", fmt.Sprintf("Error writing data: %s", err.Error()))
 				return
 			}
 			flusher.Flush()

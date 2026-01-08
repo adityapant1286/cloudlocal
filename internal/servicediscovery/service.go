@@ -1,12 +1,14 @@
 package servicediscovery
 
 import (
+	"cloudlocal/internal/cloudwatch"
 	"cloudlocal/internal/utils"
-	"log"
+	"fmt"
 	"net/http"
 )
 
 func Handle(w http.ResponseWriter) {
+	cw := cloudwatch.GetServiceInstance()
 	var activeServices []ServiceStatus
 	if utils.IsServiceEnabled("kms") {
 		activeServices = append(activeServices, ServiceStatus{
@@ -34,7 +36,7 @@ func Handle(w http.ResponseWriter) {
 		"services": serviceNames,
 		"region":   utils.AwsRegion,
 	}
-	log.Printf("Service Discovery resp:\n%s\n\n", utils.MarshalIjson(data))
+	cw.Error(SERVICE, "ServiceDiscoveryHandler", fmt.Sprintf("Service Discovery resp: %s", utils.MarshalIjson(data)))
 
 	utils.RespondByInput(utils.RespInput{
 		Writer:      w,

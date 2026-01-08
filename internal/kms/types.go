@@ -1,6 +1,12 @@
 package kms
 
-import "sync"
+import (
+	"cloudlocal/internal/cloudwatch"
+	"sync"
+)
+
+const KMS = "kms"
+const SERVICE = KMS + "-service"
 
 type kmsServiceImplementation struct {
 	kms internalKms
@@ -25,6 +31,7 @@ type Alias struct {
 // kmsImplementation (The "Class" with state)
 type kmsImplementation struct {
 	mu           sync.RWMutex
+	cloudwatch   cloudwatch.CwService
 	keys         map[string]*KmsKey
 	aliases      map[string]string // AliasName -> KeyID
 	masterSecret []byte            // Used for the AES-GCM encryption

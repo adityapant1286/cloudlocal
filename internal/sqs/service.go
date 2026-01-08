@@ -1,10 +1,10 @@
 package sqs
 
 import (
+	"cloudlocal/internal/cloudwatch"
 	"cloudlocal/internal/utils"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 )
@@ -24,11 +24,13 @@ type ServiceHandler interface {
 }
 
 func NewSQSService() ServiceHandler {
-	var sqsEnabled = utils.IsServiceEnabled("sqs")
+	cw := cloudwatch.GetServiceInstance()
+	var sqsEnabled = utils.IsServiceEnabled(SQS)
 
 	if sqsEnabled {
 		return &sqsImplementation{
-			sqs: newSqsService(),
+			cloudwatch: cw,
+			sqs:        newSqsService(cw),
 		}
 	}
 	return nil
@@ -37,7 +39,7 @@ func NewSQSService() ServiceHandler {
 func (svc *sqsImplementation) Handle(w http.ResponseWriter, r *http.Request, target string) {
 	err := r.ParseForm()
 	if err != nil {
-		log.Fatalf("Error parsing form: %s|%s", target, err.Error())
+		svc.cloudwatch.Error(SERVICE, "SQSHttpHandler", fmt.Sprintf("Error parsing form: %s|%s", target, err.Error()))
 		return
 	}
 	action := r.FormValue("Action")
@@ -145,9 +147,10 @@ type internalSqsService interface {
 	setRedrivePolicy(queueURL string, policy *RedrivePolicy)
 }
 
-func newSqsService() internalSqsService {
+func newSqsService(cw cloudwatch.CwService) internalSqsService {
 	return &sqsQueueImplementation{
-		queues: make(map[string]*Queue),
+		cloudwatch: cw,
+		queues:     make(map[string]*Queue),
 	}
 }
 
@@ -164,7 +167,7 @@ func (s *sqsQueueImplementation) createQueue(name string) (*Queue, error) {
 	}
 	s.queues[url] = q
 
-	log.Printf("Created SQS Queue:\n%s\n\n", utils.MarshalIjson(q))
+	s.cloudwatch.Info(SERVICE, "CreateQueue", fmt.Sprintf("Created SQS Queue: %s", utils.MarshalIjson(q)))
 
 	return q, nil
 }
@@ -187,7 +190,7 @@ func (s *sqsQueueImplementation) sendMessage(queueURL, body string) (*Message, e
 	}
 
 	queue.Messages = append(queue.Messages, msg)
-	log.Printf("SQS Message:\n%s\n\n", utils.MarshalIjson(msg))
+	s.cloudwatch.Info(SERVICE, "SendMessage", fmt.Sprintf("SQS Message: %s", utils.MarshalIjson(msg)))
 
 	return &msg, nil
 }
@@ -230,11 +233,11 @@ func (s *sqsQueueImplementation) receiveMessage(queueURL string, maxMessages int
 			result = append(result, *msg)
 		}
 	}
-	log.Printf("SQS Messages:\n%s\n\n", utils.MarshalIjson(map[string]any{
+	s.cloudwatch.Info(SERVICE, "ReceiveMessage", fmt.Sprintf("SQS Messages: %s", utils.MarshalIjson(map[string]any{
 		"MaxNumberOfMessages": maxMessages,
 		"QueueUrl":            queueURL,
 		"Messages":            result,
-	}))
+	})))
 
 	return result, nil
 }
@@ -257,11 +260,11 @@ func (s *sqsQueueImplementation) deleteMessage(queueURL, receiptHandle string) e
 		}
 	}
 	queue.Messages = newMsgs
-	log.Printf("SQS Message:\n%s\n\n", utils.MarshalIjson(map[string]any{
+	s.cloudwatch.Info(SERVICE, "DeleteMessage", fmt.Sprintf("Delete SQS Message: %s", utils.MarshalIjson(map[string]any{
 		"QueueUrl":                  queueURL,
 		"OldNumberOfMessages":       beforeDelete,
 		"RemainingNumberOfMessages": len(queue.Messages),
-	}))
+	})))
 	return nil
 }
 
@@ -278,10 +281,10 @@ func (s *sqsQueueImplementation) purgeQueue(queueURL string) error {
 
 	// Efficiently clear the slice
 	queue.Messages = []Message{}
-	log.Printf("Purged SQS Queue:\n%s\n\n", utils.MarshalIjson(map[string]any{
+	s.cloudwatch.Info(SERVICE, "PurgeQueue", fmt.Sprintf("Purged SQS Queue: %s", utils.MarshalIjson(map[string]any{
 		"QueueUrl":               queueURL,
 		"NumberOfMessagesPurged": noOfMsgs,
-	}))
+	})))
 
 	return nil
 }
@@ -292,7 +295,7 @@ func (s *sqsQueueImplementation) setRedrivePolicy(queueURL string, policy *Redri
 
 	queue, ok := s.queues[queueURL]
 	if !ok {
-		log.Fatal("Queue not found for setting RedrivePolicy")
+		s.cloudwatch.Error(SERVICE, "SetRedrivePolicy", fmt.Sprintf("Queue not found for setting RedrivePolicy"))
 	}
 
 	queue.RedrivePolicy = policy
