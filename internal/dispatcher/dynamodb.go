@@ -35,12 +35,12 @@ func (d *Dispatcher) HandleDynamoAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if action != "" {
-		d.ProxyToDynamo(w, r, action, payload)
+		d.ProxyToDynamo(w, action, payload)
 	}
 }
 
 // ProxyToDynamo forwards dashboard requests to the local DynamoDB process
-func (d *Dispatcher) ProxyToDynamo(w http.ResponseWriter, r *http.Request, action string, payload []byte) {
+func (d *Dispatcher) ProxyToDynamo(w http.ResponseWriter, action string, payload []byte) {
 	// DynamoDB Local is on 10051
 	url := "http://localhost:10051"
 

@@ -29,11 +29,11 @@ func (d *Dispatcher) HandleKMSAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if action != "" {
-		d.ProxyToKMS(w, r, action, payload)
+		d.ProxyToKMS(w, action, payload)
 	}
 }
 
-func (d *Dispatcher) ProxyToKMS(w http.ResponseWriter, r *http.Request, action string, payload []byte) {
+func (d *Dispatcher) ProxyToKMS(w http.ResponseWriter, action string, payload []byte) {
 	req, _ := http.NewRequest("POST", utils.CloudLocalUrl, bytes.NewBuffer(payload))
 
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")

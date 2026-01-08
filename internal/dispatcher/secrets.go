@@ -37,12 +37,12 @@ func (d *Dispatcher) HandleSecretsAdmin(w http.ResponseWriter, r *http.Request) 
 
 	if action != "" {
 		// Use your existing ProxyToDynamo but change the Target Header prefix
-		d.ProxyToSecrets(w, r, action, payload)
+		d.ProxyToSecrets(w, action, payload)
 	}
 }
 
 // ProxyToSecrets is identical to ProxyToDynamo but with a different Target header
-func (d *Dispatcher) ProxyToSecrets(w http.ResponseWriter, r *http.Request, action string, payload []byte) {
+func (d *Dispatcher) ProxyToSecrets(w http.ResponseWriter, action string, payload []byte) {
 	req, _ := http.NewRequest("POST", utils.CloudLocalUrl, bytes.NewBuffer(payload))
 
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")

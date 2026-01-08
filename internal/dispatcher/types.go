@@ -1,6 +1,7 @@
 package dispatcher
 
 import (
+	"cloudlocal/internal/cloudwatch"
 	"cloudlocal/internal/health"
 	"cloudlocal/internal/s3"
 	"cloudlocal/internal/sns"
@@ -18,6 +19,7 @@ type Dispatcher struct {
 	S3Svc  s3.ServiceHandler
 	SnsSvc sns.ServiceHandler
 	StsSvc sts.ServiceHandler
+	CwSvc  cloudwatch.CwService
 	UI     embed.FS
 	Proxy  http.Handler // DynamoDB Proxy
 }

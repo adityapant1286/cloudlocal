@@ -2,6 +2,7 @@ package health
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -22,33 +23,51 @@ func ProbeInternalServices(enabledServices string) []ServiceStatus {
 		conn, err := net.DialTimeout("tcp", "localhost:10051", 500*time.Millisecond)
 		isAlive := err == nil
 		if isAlive {
-			conn.Close()
+			err := conn.Close()
+			if err != nil {
+				log.Printf("Failed to close dynamodb connection: %v", err)
+				return nil
+			}
 		}
 
 		stats = append(stats, ServiceStatus{
-			Name: "DynamoDB", Healthy: isAlive, Port: 10050, Type: "External",
+			Id: "dynamodb", Name: "DynamoDB", Healthy: isAlive, Port: 10050, Type: "External",
 		})
 	}
 
 	// 2. Check Native Mocks (Always "Healthy" if code is running)
 	if contains(enabledServices, "kms") {
-		stats = append(stats, ServiceStatus{Name: "KMS", Healthy: true, Port: 10050, Type: "Native"})
+		stats = append(stats, ServiceStatus{
+			Id: "kms", Name: "KMS", Healthy: true, Port: 10050, Type: "Native",
+		})
 	}
 	if contains(enabledServices, "secretsmanager") {
-		stats = append(stats, ServiceStatus{Name: "Secrets Manager", Healthy: true, Port: 10050, Type: "Native"})
+		stats = append(stats, ServiceStatus{
+			Id: "secretsmanager", Name: "Secrets Manager", Healthy: true, Port: 10050, Type: "Native",
+		})
 	}
 	if contains(enabledServices, "s3") {
-		stats = append(stats, ServiceStatus{Name: "S3", Healthy: true, Port: 10050, Type: "Native"})
+		stats = append(stats, ServiceStatus{
+			Id: "s3", Name: "S3", Healthy: true, Port: 10050, Type: "Native",
+		})
 	}
 	if contains(enabledServices, "sqs") {
-		stats = append(stats, ServiceStatus{Name: "SQS", Healthy: true, Port: 10050, Type: "Native"})
+		stats = append(stats, ServiceStatus{
+			Id: "sqs", Name: "SQS", Healthy: true, Port: 10050, Type: "Native",
+		})
+	}
+
+	if contains(enabledServices, "sns") {
+		stats = append(stats, ServiceStatus{
+			Id: "sns", Name: "SNS", Healthy: true, Port: 10050, Type: "Native",
+		})
 	}
 
 	return stats
 }
 
 func GetStorageStats(volumeDir string) map[string]string {
-	services := []string{"s3", "dynamodb", "sqs", "kms", "secretsmanager"}
+	services := []string{"s3", "dynamodb", "sqs", "sns", "kms", "secretsmanager"}
 	stats := make(map[string]string)
 
 	for _, svc := range services {

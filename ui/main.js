@@ -832,8 +832,7 @@ function s3ValidateBucketName(name) {
   const hint = document.getElementById('s3-bucket-hint');
 
   btn.disabled = !isValid;
-  hint.className = isValid ? "mt-2 text-[9px] text-emerald-500"
-      : "mt-2 text-[9px] text-red-500";
+  hint.className = isValid ? "mt-2 text-[9px] text-emerald-500" : "mt-2 text-[9px] text-red-500";
 }
 
 function s3OpenCreateBucketModal() {
@@ -849,8 +848,7 @@ function s3CloseCreateBucketModal() {
 
 async function s3PerformCreateBucket() {
   const name = document.getElementById('s3-new-bucket-name').value;
-  const res = await fetch(`/dashboard/api/s3/create-bucket?name=${name}`,
-      {method: 'POST'});
+  const res = await fetch(`/dashboard/api/s3/create-bucket?name=${name}`, {method: 'POST'});
   if (res.ok) {
     s3CloseCreateBucketModal();
     await s3LoadBuckets();
@@ -1016,15 +1014,98 @@ async function s3DeleteObject(key) {
 async function s3ViewObject(key) {
   // In a real AWS environment, you'd use a Presigned URL.
   // Locally, we can just fetch the object data.
-  const res = await fetch(
-      `/dashboard/api/s3/get-object?bucket=${s3CurrentBucket}&key=${encodeURIComponent(
-          key)}`);
+  const res = await fetch(`/dashboard/api/s3/get-object?bucket=${s3CurrentBucket}&key=${encodeURIComponent(key)}`);
   const data = await res.json();
 
   // Decode from base64 (AWS returns Body as base64 in many JSON proxies)
   const content = atob(data.Body);
 
   openCellModal(`S3: ${key}`, content);
+}
+
+// Cloudwatch
+let cwCurrentLogGroup = "";
+let cwCurrentLogStream = "";
+
+async function cwLoadLogGroups() {
+  const res = await fetch('/dashboard/api/logs/groups');
+  const data = await res.json();
+  const container = document.getElementById('cw-group-list');
+
+  if (data && data.logGroups) {
+    container.innerHTML = data.logGroups.map(g => `
+        <button onclick="cwSelectLogGroup('${g.logGroupName}')" class="w-full text-left px-3 py-2 rounded-md text-xs transition-all hover:bg-gray-800 text-slate-400 hover:text-white truncate">
+            ${g.logGroupName}
+        </button>
+    `).join('');
+  }
+}
+
+async function cwSelectLogGroup(groupName) {
+  cwCurrentLogGroup = groupName;
+  document.getElementById('cw-streams-panel').classList.remove('hidden');
+  document.getElementById('cw-events-panel').classList.add('hidden');
+
+  const res = await fetch(`/dashboard/api/logs/streams?group=${encodeURIComponent(groupName)}`);
+  const data = await res.json();
+  const container = document.getElementById('cw-stream-list');
+
+  container.innerHTML = data.logStreams.map(s => `
+        <button onclick="cwSelectLogStream('${s.logStreamName}')" class="w-full text-left px-3 py-2 rounded-md text-[11px] transition-all hover:bg-gray-800 text-slate-300 hover:text-orange-400 truncate font-mono">
+            ${s.logStreamName}
+        </button>
+    `).join('');
+}
+
+async function cwSelectLogStream(streamName) {
+  cwCurrentLogStream = streamName;
+  document.getElementById('cw-events-panel').classList.remove('hidden');
+  document.getElementById('active-stream-name').innerText = streamName;
+  await cwRefreshLogs();
+}
+
+function cwApplyLogFilter(keyword) {
+  const term = keyword.toLowerCase();
+  const rows = document.querySelectorAll('#cw-event-list > div');
+
+  rows.forEach(row => {
+    // We only search the message part, not the timestamp
+    const messageText = row.querySelector('.log-message-body').innerText.toLowerCase();
+
+    if (messageText.includes(term)) {
+      row.classList.remove('hidden');
+    } else {
+      row.classList.add('hidden');
+    }
+  });
+}
+
+async function cwRefreshLogs() {
+  const container = document.getElementById('cw-event-list');
+  const res = await fetch(`/dashboard/api/logs/events?group=${encodeURIComponent(cwCurrentLogGroup)}&stream=${encodeURIComponent(cwCurrentLogStream)}`);
+  const data = await res.json();
+
+  container.innerHTML = data.events.map(e => {
+    const date = new Date(e.timestamp).toISOString();
+    let message = e.message;
+
+    message = message.replace(/ERROR/g, '<span class="text-red-500 font-bold">ERROR</span>');
+    message = message.replace(/WARN/g, '<span class="text-yellow-500 font-bold">WARN</span>');
+    message = message.replace(/INFO/g, '<span class="text-blue-400 font-bold">INFO</span>');
+
+    return `
+        <div class="py-1 border-b border-gray-900/30 flex gap-4 group hover:bg-white/5 transition-colors">
+            <span class="text-gray-300 shrink-0 select-none text-[10px]">${date}</span>
+            <span class="log-message-body text-gray-200 break-all">${message}</span>
+        </div>`;
+  }).join('');
+
+  // Re-apply any existing filter after refresh
+  const currentFilter = document.getElementById('cw-log-filter').value;
+  if (currentFilter) {
+    cwApplyLogFilter(currentFilter);
+  }
+  container.scrollTop = container.scrollHeight;
 }
 
 // system overview
@@ -1061,6 +1142,9 @@ async function showView(viewId) {
     case 's3':
       await s3LoadBuckets();
       return;
+    case 'cloudwatch':
+      await cwLoadLogGroups()
+      return;
   }
 }
 
@@ -1085,16 +1169,19 @@ async function fetchOverviewData() {
 
     // 1. Update Sidebar Status
     const serviceList = document.getElementById('service-list');
-    serviceList.innerHTML = data.services.map(s => `
-                    <div class="flex items-center justify-between group">
-                        <span class="text-sm font-medium ${s.healthy
-        ? 'text-slate-200' : 'text-gray-600'}">${s.name}</span>
-                        <div class="flex items-center gap-2">
-                            <div class="w-2 h-2 rounded-full ${s.healthy
-        ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500 status-pulse'}"></div>
-                        </div>
-                    </div>
-                `).join('');
+    serviceList.innerHTML = data.services.map(s => {
+      const menuItem = document.getElementById(`menu-item-${s.id}`.toLowerCase())
+      if (menuItem) {
+        menuItem.classList.remove('hidden');
+      }
+      return `
+        <div class="flex items-center justify-between group">
+          <span class="text-sm font-medium ${s.healthy ? 'text-slate-200' : 'text-gray-600'}">${s.name}</span>
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full ${s.healthy ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500 status-pulse'}"></div>
+          </div>
+        </div>
+      `}).join('');
 
     // 2. Update Storage Grid
     /*

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cloudlocal/internal/cloudwatch"
 	"cloudlocal/internal/dispatcher"
 	"cloudlocal/internal/kms"
 	"cloudlocal/internal/s3"
@@ -30,6 +31,7 @@ func main() {
 		S3Svc:  s3.NewS3Service(),
 		SnsSvc: sns.NewSnsService(sqsService),
 		StsSvc: sts.NewStsService(),
+		CwSvc:  cloudwatch.NewCloudWatchService(),
 		UI:     uiFiles,
 		Proxy:  createDynamoProxy(),
 	}
