@@ -8,6 +8,8 @@ import (
 	"net/http"
 )
 
+const DYNAMODB = "dynamodb"
+
 func (d *Dispatcher) HandleDynamoAdmin(w http.ResponseWriter, r *http.Request) {
 	action := ""
 	var payload []byte
@@ -55,17 +57,21 @@ func (d *Dispatcher) ProxyToDynamo(w http.ResponseWriter, action string, payload
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		http.Error(w, "DynamoDB Proxy Error: "+err.Error(), 500)
+		d.CwSvc.Error(DYNAMODB, action, err.Error())
+		http.Error(w, "DynamoDB Error: "+err.Error(), 500)
 		return
 	}
+
 	defer resp.Body.Close()
+
+	d.CwSvc.Info(DYNAMODB, action, " => "+resp.Status)
 
 	// Forward the DynamoDB response back to the Dashboard
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
 	_, err = io.Copy(w, resp.Body)
 	if err != nil {
-		http.Error(w, "DynamoDB Proxy Copy Error: "+err.Error(), 500)
+		http.Error(w, "DynamoDB response parse error: "+err.Error(), 500)
 		return
 	}
 }
