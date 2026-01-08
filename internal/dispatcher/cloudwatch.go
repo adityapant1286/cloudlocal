@@ -9,7 +9,6 @@ func (d *Dispatcher) HandleCloudWatchAdmin(w http.ResponseWriter, r *http.Reques
 	//action := ""
 	//var payload []byte
 	w.Header().Set("Content-Type", "application/json")
-	d.CwSvc.AddLog("S3-Service", "Uploads", "User uploaded file.txt")
 
 	switch r.URL.Path {
 	case "/dashboard/api/logs/groups":
