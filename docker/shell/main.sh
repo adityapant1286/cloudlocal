@@ -1,7 +1,8 @@
 #!/bin/bash
 # https://www.geeksforgeeks.org/linux-unix/if-command-in-linux-with-examples/
 
-APP_HOME=${APP_HOME:-/opt/cloudlocal}
+APP_HOME=/opt/cloudlocal
+APP_DATA_HOME=/opt/cloudlocal-data
 SERVICES="${ENABLED_SERVICES:-}"
 SERVICES="${SERVICES,,}" # Lowercase for easier matching
 SERVICES="${SERVICES// /}" # Remove all spaces for easier matching
@@ -26,6 +27,7 @@ contains_service() {
   [[ ",$SERVICES," == *",${1,,},"* ]]
 }
 
+mkdir -p "$APP_DATA_HOME/logs"
 mkdir -p "$APP_HOME/logs"
 
 # --- Service 1: DynamoDB Local ---
@@ -33,10 +35,8 @@ dynamodb_service() {
   DYNAMODB_PORT=10051
   DYNAMO_DB_LOCAL="$APP_HOME/dynamodb_local_latest"
 
-  DYNAMO_DB_PATH="$APP_HOME/dynamodb"
-  if [[ -n "${CLOUDLOCAL_VOLUME_DIR:-}" ]]; then
-    DYNAMO_DB_PATH="$CLOUDLOCAL_VOLUME_DIR/dynamodb"
-  fi
+  DYNAMO_DB_PATH="$APP_DATA_HOME/dynamodb"
+
   mkdir -p "$DYNAMO_DB_PATH"
 
 #  echo "Starting DynamoDB Local"
@@ -47,7 +47,7 @@ dynamodb_service() {
       -Dsqlite4java.library.path="$DYNAMO_DB_LIB" \
       -jar "$DYNAMO_DB_LOCAL/DynamoDBLocal.jar" \
       -dbPath "$DYNAMO_DB_PATH" \
-      -port $DYNAMODB_PORT -sharedDb -disableTelemetry > "$APP_HOME/logs/dynamodb.log" 2>&1 &
+      -port $DYNAMODB_PORT -sharedDb -disableTelemetry > "$APP_DATA_HOME/logs/dynamodb.log" 2>&1 &
 #      | grep -vE "Initializing DynamoDB Local|Port:|InMemory:|Version:|DbPath:|SharedDb:|shouldDelayTransientStatuses:|CorsParams:" &
 
   PIDS+=($!) # Store the PID

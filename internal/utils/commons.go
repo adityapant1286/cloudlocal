@@ -17,7 +17,7 @@ import (
 	"strings"
 )
 
-var DefaultDir = "/opt/cloudlocal"
+var DefaultDir = "/opt/cloudlocal-data"
 
 func GetEnv(key string, fallback string) string {
 	value := os.Getenv(key)

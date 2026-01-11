@@ -152,11 +152,9 @@ async function fetchDdbTableData(next = false) {
     const result = await res.json();
     ddbLastEvaluatedKey = result.LastEvaluatedKey;
 
-    const items = result.Items.map(
-        item => DynamoDbParser.unmarshall({M: item}));
+    const items = result.Items.map(item => DynamoDbParser.unmarshall({M: item}));
     if (ddbRowCount) {
-      ddbRowCount.innerText = `${items.length} Item${items.length === 1 ? ''
-          : 's'}`;
+      ddbRowCount.innerText = `${items.length} Item${items.length === 1 ? '' : 's'}`;
     }
     renderDdbTableGrid(items);
     // Update the column dropdown based on the keys we found
@@ -217,12 +215,21 @@ async function toggleDdbAutoRefresh() {
   }
 }
 
+function ddbSchemeExtractKeys(items, schema) {
+  const arr = [schema.pk]
+  if (schema.sk) {
+    arr.push(schema.sk);
+  }
+  arr.push(...new Set(items.flatMap(obj => Object.keys(obj))))
+
+  return [...new Set(arr)];
+}
+
 function renderDdbTableGrid(items) {
-  // if (items.length === 0) return;
 
   // 1. Get all unique keys for headers
-  const keys = [...new Set(items.flatMap(obj => Object.keys(obj)))];
   const schema = tableSchemas[currentDdbTable] || {};
+  const keys = ddbSchemeExtractKeys(items, schema)
 
   // 2. Render Headers
   document.getElementById('ddb-grid-header').innerHTML = `
@@ -230,8 +237,7 @@ function renderDdbTableGrid(items) {
             ${keys.map(k => `
                 <th class="p-3 text-gray-400 border-b border-gray-700 whitespace-nowrap bg-gray-800">
                     <div class="flex items-center gap-1">
-                        ${(k === schema.pk || k === schema.sk)
-      ? '<span class="text-orange-500">🔑</span>' : ''}
+                        ${(k === schema.pk || k === schema.sk) ? '<span class="text-orange-500">🔑</span>' : ''}
                         ${k}
                     </div>
                 </th>
@@ -246,22 +252,19 @@ function renderDdbTableGrid(items) {
     return `
         <tr class="hover:bg-gray-800/30 group transition-colors">
             ${keys.map(k => {
-      const val = item[k];
-      const displayVal = (typeof val === 'object' && val !== null)
-          ? JSON.stringify(val) : (val ?? '-');
-
-      // Create a safe string for the onclick handler
-      const safeVal = encodeURIComponent(JSON.stringify(val));
-      return `
-                <td class="p-3 text-slate-300 border-b border-gray-800/50 whitespace-nowrap overflow-hidden text-ellipsis max-w-[250px]">
-                  <div onclick="openCellModal('${k}', JSON.parse(decodeURIComponent('${safeVal}')))" 
-                       class="cursor-pointer hover:text-orange-400 transition-colors"
-                       title="Click to expand">
-                      ${displayVal}
-                  </div>
-                </td>`;
-    }).join('')}
-            <td class="p-3 border-b border-gray-800/50 text-right space-x-2 whitespace-nowrap">
+              const val = item[k];
+              const displayVal = (typeof val === 'object' && val !== null) ? JSON.stringify(val) : (val ?? '-');
+        
+              // Create a safe string for the onclick handler
+              const safeVal = encodeURIComponent(JSON.stringify(val));
+              return `
+                     <td class="p-3 text-slate-300 border-b border-gray-800/50 whitespace-nowrap overflow-hidden text-ellipsis max-w-[250px]">
+                        <div onclick="openCellModal('${k}', JSON.parse(decodeURIComponent('${safeVal}')))" class="cursor-pointer hover:text-orange-400 transition-colors" title="Click to expand">
+                            ${displayVal}
+                        </div>
+                     </td>`;
+            }).join('')}
+            <td class="p-3 border-b border-gray-800/50 bg-gray-950 text-right space-x-2 whitespace-nowrap sticky right-0 z-20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.4)]">
               <button onclick="duplicateDdbItem('${itemStr}')" class="text-emerald-400 hover:text-emerald-300 transition-colors inline-block" title="Duplicate">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path>
