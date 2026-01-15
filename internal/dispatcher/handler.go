@@ -100,17 +100,15 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if contentType == "application/x-www-form-urlencoded" {
-		if d.SqsSvc != nil && strings.HasPrefix(amzTarget, "AmazonSQS") {
+	if d.SqsSvc != nil && (strings.HasPrefix(amzTarget, "AmazonSQS") || contentType == "application/x-www-form-urlencoded") {
 
-			d.SqsSvc.Handle(w, r, amzTarget)
-			return
-		}
-		if d.SnsSvc != nil && isSnsAction(action) {
+		d.SqsSvc.Handle(w, r, amzTarget)
+		return
+	}
+	if d.SnsSvc != nil && isSnsAction(action) {
 
-			d.SnsSvc.Handle(w, bodyValues)
-			return
-		}
+		d.SnsSvc.Handle(w, bodyValues)
+		return
 	}
 
 	if d.S3Svc != nil && isS3Request(r) {

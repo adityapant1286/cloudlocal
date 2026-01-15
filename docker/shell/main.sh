@@ -2,7 +2,7 @@
 # https://www.geeksforgeeks.org/linux-unix/if-command-in-linux-with-examples/
 
 APP_HOME=/opt/cloudlocal
-APP_DATA_HOME=/opt/cloudlocal-data
+APP_DATA_HOME=/opt/cloudlocal-data/cloudlocal
 SERVICES="${ENABLED_SERVICES:-}"
 SERVICES="${SERVICES,,}" # Lowercase for easier matching
 SERVICES="${SERVICES// /}" # Remove all spaces for easier matching

@@ -66,9 +66,9 @@ let tableSchemas = {}; // Cache for { tableName: { pk: 'id', sk: 'timestamp' } }
 
 async function selectDdbTable(tableName) {
   // Highlight the selected button
-  document.querySelectorAll('.table-btn').forEach(
-      b => b.classList.remove('bg-gray-800', 'border-gray-700', 'text-white'));
-  event.currentTarget.classList.add('bg-gray-800', 'border-gray-700',
+  document.querySelectorAll('.table-btn')
+  .forEach(b => b.classList.remove('bg-neutral-800', 'border-neutral-700', 'text-white'));
+  event.currentTarget.classList.add('bg-neutral-800', 'border-neutral-700',
       'text-white');
 
   currentDdbTable = tableName;
@@ -179,7 +179,7 @@ function renderDdbPagination(hasMore) {
   const container = document.getElementById('ddb-pagination-controls');
   if (hasMore) {
     container.innerHTML = `
-            <button onclick="fetchDdbTableData(true)" class="bg-gray-800 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1">
+            <button onclick="fetchDdbTableData(true)" class="bg-neutral-800 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1">
                 Load More
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-width="3"></path></svg>
             </button>
@@ -235,14 +235,14 @@ function renderDdbTableGrid(items) {
   document.getElementById('ddb-grid-header').innerHTML = `
         <tr>
             ${keys.map(k => `
-                <th class="p-3 text-gray-400 border-b border-gray-700 whitespace-nowrap bg-gray-800">
+                <th class="p-3 text-gray-400 border-b border-neutral-700 whitespace-nowrap bg-neutral-800">
                     <div class="flex items-center gap-1">
                         ${(k === schema.pk || k === schema.sk) ? '<span class="text-orange-500">🔑</span>' : ''}
                         ${k}
                     </div>
                 </th>
             `).join('')}
-            <th class="p-3 text-gray-400 border-b border-gray-700 text-right bg-gray-800 sticky right-0 z-20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.4)]">Actions</th>
+            <th class="p-3 text-gray-400 border-b border-neutral-700 text-right bg-neutral-800 sticky right-0 z-20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.4)]">Actions</th>
         </tr>
     `;
 
@@ -250,7 +250,7 @@ function renderDdbTableGrid(items) {
   document.getElementById('ddb-grid-body').innerHTML = items.map(item => {
     const itemStr = encodeURIComponent(JSON.stringify(item));
     return `
-        <tr class="hover:bg-gray-800/30 group transition-colors">
+        <tr class="hover:bg-neutral-800/30 group transition-colors">
             ${keys.map(k => {
               const val = item[k];
               const displayVal = (typeof val === 'object' && val !== null) ? JSON.stringify(val) : (val ?? '-');
@@ -258,13 +258,13 @@ function renderDdbTableGrid(items) {
               // Create a safe string for the onclick handler
               const safeVal = encodeURIComponent(JSON.stringify(val));
               return `
-                     <td class="p-3 text-slate-300 border-b border-gray-800/50 whitespace-nowrap overflow-hidden text-ellipsis max-w-[250px]">
+                     <td class="p-3 text-slate-300 border-b border-neutral-800/50 whitespace-nowrap overflow-hidden text-ellipsis max-w-[250px]">
                         <div onclick="openCellModal('${k}', JSON.parse(decodeURIComponent('${safeVal}')))" class="cursor-pointer hover:text-orange-400 transition-colors" title="Click to expand">
                             ${displayVal}
                         </div>
                      </td>`;
             }).join('')}
-            <td class="p-3 border-b border-gray-800/50 bg-gray-950 text-right space-x-2 whitespace-nowrap sticky right-0 z-20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.4)]">
+            <td class="p-3 border-b border-neutral-800/50 bg-neutral-950 text-right space-x-2 whitespace-nowrap sticky right-0 z-20 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.4)]">
               <button onclick="duplicateDdbItem('${itemStr}')" class="text-emerald-400 hover:text-emerald-300 transition-colors inline-block" title="Duplicate">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path>
@@ -672,7 +672,7 @@ async function sqsLoadQueues() {
     const count = attrData.Attributes.ApproximateNumberOfMessages;
 
     container.innerHTML += `
-            <button onclick="sqsSelectQueue('${url}', '${name}')" class="w-full text-left p-3 rounded-lg border border-gray-800/50 hover:bg-gray-800 transition-all group">
+            <button onclick="sqsSelectQueue('${url}', '${name}')" class="w-full text-left p-3 rounded-lg border border-neutral-800/50 hover:bg-gray-800 transition-all group">
                 <div class="text-slate-300 text-xs font-bold truncate">${name}</div>
                 <div class="flex justify-between items-center mt-1">
                     <span class="text-[10px] text-gray-500">Messages</span>
@@ -748,7 +748,7 @@ async function sqsReceiveMessages() {
     // Encode the ReceiptHandle as it can contain special characters
     const handle = encodeURIComponent(m.ReceiptHandle);
     return `
-        <div class="bg-gray-900 border border-gray-800 rounded-lg p-3 relative group">
+        <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-3 relative group">
             <div class="flex justify-between items-center mb-2">
                 <span class="text-[9px] text-gray-500 font-mono">ID: ${m.MessageId.substring(0, 8)}...</span>
                 <button onclick="sqsDeleteMessage('${handle}')" 
@@ -929,7 +929,7 @@ async function s3SelectBucket(name, path) {
   container.innerHTML = data.Contents.map(obj => {
     const safeKey = encodeURIComponent(obj.Key);
     return `
-        <tr class="hover:bg-gray-800/30 group border-b border-gray-800/50 transition-colors">
+        <tr class="hover:bg-gray-800/30 group border-b border-neutral-800/50 transition-colors">
         <td class="p-3">
             <button onclick="s3ViewObject('${safeKey}')" 
                     class="text-blue-400 hover:text-blue-300 hover:underline text-left transition-colors">
@@ -1098,7 +1098,7 @@ async function cwRefreshLogs() {
     message = message.replace(/WARN/g, '<span class="text-yellow-500 font-bold">WARN</span>');
 
     return `
-        <div class="pb-1 border-b border-gray-900/30 flex gap-4 group hover:bg-white/5 transition-colors">
+        <div class="pb-1 border-b border-neutral-900/30 flex gap-4 group hover:bg-white/5 transition-colors">
             <span class="text-gray-300 shrink-0 select-none text-[10px]">${date}</span>
             <span class="log-message-body text-gray-200 break-all">${message}</span>
         </div>`;
