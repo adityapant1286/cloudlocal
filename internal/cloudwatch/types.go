@@ -7,6 +7,7 @@ import "sync"
 //}
 
 type LogEvent struct {
+	Level     string `json:"level"`
 	Timestamp int64  `json:"timestamp"`
 	Message   string `json:"message"`
 }

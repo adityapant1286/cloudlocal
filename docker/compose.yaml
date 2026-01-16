@@ -10,6 +10,7 @@ services:
       - "10050-10070:10050-10070"
     environment:
       - ENABLED_SERVICES=dynamodb,s3,sqs,kms,secretsmanager
+      - CLOUDWATCH_CONSOLE_LOG=true
       - AWS_ENDPOINT_OVERRIDE=http://cloudlocal:10050
       - AWS_ACCESS_KEY_ID=cloudlocal
       - AWS_SECRET_ACCESS_KEY=cloudlocal

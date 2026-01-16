@@ -28,7 +28,6 @@ contains_service() {
 }
 
 mkdir -p "$APP_DATA_HOME/logs"
-mkdir -p "$APP_HOME/logs"
 
 # --- Service 1: DynamoDB Local ---
 dynamodb_service() {
@@ -57,7 +56,13 @@ dynamodb_service() {
 edge_dispatcher() {
 #  echo "Starting CloudLocal Edge Dispatcher on port 10050..."
   # We start this in the background just like others
-  ./cloudlocal-edge > "$APP_HOME/logs/edge.log" 2>&1 &
+  if [ "${CLOUDWATCH_CONSOLE_LOG}" == "true" ]; then
+    ./cloudlocal-edge 2>&1 | tee -a "$APP_DATA_HOME/logs/edge.log" &
+  else
+    ./cloudlocal-edge > "$APP_DATA_HOME/logs/edge.log" 2>&1 &
+  fi
+
+
   PIDS+=($!)
 }
 

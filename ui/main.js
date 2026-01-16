@@ -1090,17 +1090,17 @@ async function cwRefreshLogs() {
 
   container.innerHTML = data.events.map(e => {
     const date = new Date(e.timestamp).toISOString();
-    let message = e.message;
+    let level = e.level;
 
-    message = message.replace(/DEBUG/g, '<span class="text-cyan-400 font-bold">DEBUG</span>');
-    message = message.replace(/ERROR/g, '<span class="text-red-500 font-bold">ERROR</span>');
-    message = message.replace(/INFO/g, '<span class="text-blue-400 font-bold">INFO</span>');
-    message = message.replace(/WARN/g, '<span class="text-yellow-500 font-bold">WARN</span>');
+    level = level.replace(/DEBUG/g, '<span class="text-cyan-400 font-bold">DEBUG</span>');
+    level = level.replace(/ERROR/g, '<span class="text-red-500 font-bold">ERROR</span>');
+    level = level.replace(/INFO/g, '<span class="text-blue-400 font-bold">INFO</span>');
+    level = level.replace(/WARN/g, '<span class="text-yellow-500 font-bold">WARN</span>');
 
     return `
         <div class="pb-1 border-b border-neutral-900/30 flex gap-4 group hover:bg-white/5 transition-colors">
             <span class="text-gray-300 shrink-0 select-none text-[10px]">${date}</span>
-            <span class="log-message-body text-gray-200 break-all">${message}</span>
+            <span class="log-message-body text-gray-200 break-all">${level} - ${e.message}</span>
         </div>`;
   }).join('');
 

@@ -19,6 +19,15 @@ import (
 
 var DefaultDir = "/opt/cloudlocal-data"
 
+const (
+	ResetCc     = "\033[0m"
+	RedCc       = "\033[31m"
+	YellowCc    = "\033[33m"
+	BlueCc      = "\033[94m"
+	CyanCc      = "\033[36m"
+	LightGrayCc = "\033[37m"
+)
+
 func GetEnv(key string, fallback string) string {
 	value := os.Getenv(key)
 	if len(value) == 0 {
@@ -35,6 +44,7 @@ const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 var EnabledServices = strings.ToLower(GetEnv("ENABLED_SERVICES", ""))
 var VolumeDir = DefaultDir + "/cloudlocal"
+var CloudWatchConsoleLogEnabled = GetEnv("CLOUDWATCH_CONSOLE_LOG", "false") == "true"
 var AwsRegion = strings.ToLower(GetEnv("AWS_REGION", "ap-southeast-2"))
 var S3OwnerId = strings.ToLower(GetEnv("S3_OWNER_ID", "cloudlocal-s3-owner-id"))
 var DashboardEnabled = GetEnv("DISABLE_DASHBOARD", "false") != "true"

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -17,8 +18,19 @@ var (
 	instance *cloudwatchImplementation
 )
 
+const (
+	debugLvl    = "[DEBUG]"
+	errorLvl    = "[ERROR]"
+	infoLvl     = "[INFO]"
+	warnLvl     = "[WARN]"
+	debugCliTag = utils.CyanCc + debugLvl + utils.ResetCc
+	errorCliTag = utils.RedCc + errorLvl + utils.ResetCc
+	infoCliTag  = utils.BlueCc + infoLvl + utils.ResetCc
+	warnCliTag  = utils.YellowCc + warnLvl + utils.ResetCc
+)
+
 type CwService interface {
-	AddLog(group, stream, message string)
+	AddLog(level, group, stream, message string)
 	Debug(group, stream, message string)
 	Error(group, stream, message string)
 	Info(group, stream, message string)
@@ -71,22 +83,22 @@ func (s *cloudwatchImplementation) load() {
 }
 
 func (s *cloudwatchImplementation) Debug(group, stream, message string) {
-	s.AddLog(group, stream, "[DEBUG] "+message)
+	s.AddLog(debugLvl, group, stream, message)
 }
 
 func (s *cloudwatchImplementation) Error(group, stream, message string) {
-	s.AddLog(group, stream, "[ERROR] "+message)
+	s.AddLog(errorLvl, group, stream, message)
 }
 
 func (s *cloudwatchImplementation) Info(group, stream, message string) {
-	s.AddLog(group, stream, "[INFO] "+message)
+	s.AddLog(infoLvl, group, stream, message)
 }
 
 func (s *cloudwatchImplementation) Warn(group, stream, message string) {
-	s.AddLog(group, stream, "[WARN] "+message)
+	s.AddLog(warnLvl, group, stream, message)
 }
 
-func (s *cloudwatchImplementation) AddLog(group, stream, message string) {
+func (s *cloudwatchImplementation) AddLog(level, group, stream, message string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -98,10 +110,20 @@ func (s *cloudwatchImplementation) AddLog(group, stream, message string) {
 	}
 
 	s.Groups[group][stream].Events = append(s.Groups[group][stream].Events, LogEvent{
+		Level:     level,
 		Timestamp: time.Now().UnixNano() / int64(time.Millisecond),
-		Message:   message,
+		Message:   " " + message,
 	})
 	s.save()
+
+	if utils.CloudWatchConsoleLogEnabled {
+		var lvl = strings.ReplaceAll(level, debugLvl, debugCliTag)
+		lvl = strings.ReplaceAll(lvl, errorLvl, errorCliTag)
+		lvl = strings.ReplaceAll(lvl, infoLvl, infoCliTag)
+		lvl = strings.ReplaceAll(lvl, warnLvl, warnCliTag)
+
+		log.Printf("- %s - %s[%s] - %s%s - %s", lvl, utils.LightGrayCc, group, stream, utils.ResetCc, message)
+	}
 }
 
 func (s *cloudwatchImplementation) ListGroupNames() []LogGroupRes {
