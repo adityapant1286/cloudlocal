@@ -390,7 +390,7 @@ function duplicateDdbItem(itemJsonString) {
   // Open the same modal we use for Create/Edit
   document.getElementById('ddb-item-create-modal').classList.remove('hidden');
   document.getElementById(
-      'ddb-item-active-modal-title').innerText = "Duplicate Item";
+      'ddb-item-active-modal-title').innerText = "Clone Item";
 
   // Fill the textarea with the current item's JSON
   // The user will need to change the ID/Partition Key before clicking Save
