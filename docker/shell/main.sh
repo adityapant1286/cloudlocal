@@ -57,7 +57,7 @@ edge_dispatcher() {
 #  echo "Starting CloudLocal Edge Dispatcher on port 10050..."
   # We start this in the background just like others
   if [ "${CLOUDWATCH_CONSOLE_LOG}" == "true" ]; then
-    ./cloudlocal-edge 2>&1 | tee -a "$APP_DATA_HOME/logs/edge.log" &
+    ./cloudlocal-edge 2>&1 | tee >(sed -u 's/\x1b\[[0-9;]*m//g' >> "$APP_DATA_HOME/logs/edge.log") &
   else
     ./cloudlocal-edge > "$APP_DATA_HOME/logs/edge.log" 2>&1 &
   fi

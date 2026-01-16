@@ -83,7 +83,9 @@ func (s *cloudwatchImplementation) load() {
 }
 
 func (s *cloudwatchImplementation) Debug(group, stream, message string) {
-	s.AddLog(debugLvl, group, stream, message)
+	if utils.DebugLogEnabled {
+		s.AddLog(debugLvl, group, stream, message)
+	}
 }
 
 func (s *cloudwatchImplementation) Error(group, stream, message string) {

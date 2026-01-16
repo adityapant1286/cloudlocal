@@ -45,6 +45,7 @@ const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 var EnabledServices = strings.ToLower(GetEnv("ENABLED_SERVICES", ""))
 var VolumeDir = DefaultDir + "/cloudlocal"
 var CloudWatchConsoleLogEnabled = GetEnv("CLOUDWATCH_CONSOLE_LOG", "false") == "true"
+var DebugLogEnabled = GetEnv("DEBUG_LOG", "false") == "true"
 var AwsRegion = strings.ToLower(GetEnv("AWS_REGION", "ap-southeast-2"))
 var S3OwnerId = strings.ToLower(GetEnv("S3_OWNER_ID", "cloudlocal-s3-owner-id"))
 var DashboardEnabled = GetEnv("DISABLE_DASHBOARD", "false") != "true"
