@@ -42,6 +42,7 @@ func (svc *s3ServiceImplementation) Handle(w http.ResponseWriter, r *http.Reques
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	svc.cloudwatch.Info(SERVICE, "HttpHandler", fmt.Sprintf("S3 amz-target: %v", target))
 	queryParams := r.URL.Query()
+
 	if len(parts) == 0 || parts[0] == "" {
 		// List Buckets (GET /)
 		resp := svc.s3.listBuckets()
@@ -272,11 +273,10 @@ func (s *s3Implementation) load() {
 		return // File doesn't exist yet, which is fine
 	}
 
-	buckets := make(map[string]*Bucket)
 	for _, entry := range entries {
 		if entry.IsDir() {
 			info, _ := entry.Info()
-			buckets[entry.Name()] = &Bucket{
+			s.buckets[entry.Name()] = &Bucket{
 				Name:         entry.Name(),
 				CreationDate: info.ModTime(),
 				Path:         filepath.Join(s.storagePath, entry.Name()),
@@ -373,7 +373,7 @@ func (s *s3Implementation) listObjectsV2(bucket, prefix string) (ListObjectsV2Re
 			resp.Contents = append(resp.Contents, Object{
 				Key:          key,
 				LastModified: info.ModTime(),
-				ETag:         `"mock-etag"`,
+				ETag:         "etag-" + strings.ReplaceAll(key, " ", "-"),
 				Size:         info.Size(),
 				StorageClass: "STANDARD",
 			})

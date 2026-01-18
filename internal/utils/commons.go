@@ -2,7 +2,9 @@ package utils
 
 import (
 	"bytes"
+	"crypto/md5"
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -210,6 +212,12 @@ func ParseBody(r *http.Request) url.Values {
 	}
 
 	return values
+}
+
+func HashMd5(data []byte) string {
+	hashInBytes := md5.Sum(data)
+	// Convert the byte slice to a hex string
+	return hex.EncodeToString(hashInBytes[:])
 }
 
 func ExtractFieldValues[T any, R any](objs []T, fieldMapper func(T) R) []R {

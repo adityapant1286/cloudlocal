@@ -16,6 +16,10 @@ func (d *Dispatcher) HandleSQSAdmin(w http.ResponseWriter, r *http.Request) {
 	case "/dashboard/api/sqs/list":
 		action = "ListQueues"
 		payload = []byte("{}")
+	case "/dashboard/api/sqs/create-queue":
+		name := r.URL.Query().Get("name")
+		action = "CreateQueue"
+		payload = []byte(fmt.Sprintf(`{"QueueName": "%s"}`, name))
 	case "/dashboard/api/sqs/attributes":
 		url := r.URL.Query().Get("url")
 		action = "GetQueueAttributes"

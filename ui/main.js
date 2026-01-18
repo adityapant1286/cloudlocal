@@ -185,7 +185,7 @@ function renderDdbPagination(hasMore) {
             </button>
         `;
   } else {
-    container.innerHTML = `<span class="text-[10px] text-gray-600 font-bold uppercase py-1 px-3">End of Table</span>`;
+    container.innerHTML = `<span class="text-[10px] text-gray-600 font-bold py-1 px-3">End of Table</span>`;
   }
 }
 
@@ -452,7 +452,7 @@ async function loadSecrets() {
   container.innerHTML = data.SecretList.map(s => `
         <button onclick="selectSecret('${s.Name}')" class="w-full text-left px-4 py-3 rounded-lg text-sm transition-all hover:bg-gray-800 group border border-transparent hover:border-gray-700">
             <div class="text-slate-300 font-medium">${s.Name}</div>
-            <div class="text-[10px] text-gray-500 truncate">${s.ARN}</div>
+            <div class="text-[10px] text-gray-300 truncate">${s.ARN}</div>
         </button>
     `).join('');
 }
@@ -659,26 +659,46 @@ let sqsCurrentQueueUrl = "";
 async function sqsLoadQueues() {
   const res = await fetch('/dashboard/api/sqs/list');
   const data = await res.json();
-  const urls = data.QueueUrls || [];
+  const queues = data.Queues || [];
   const container = document.getElementById('sqs-queue-list');
 
   container.innerHTML = '';
-  for (const url of urls) {
-    const name = url.split('/').pop();
-    // Fetch counts for each queue
-    const attrRes = await fetch(
-        `/dashboard/api/sqs/attributes?url=${encodeURIComponent(url)}`);
-    const attrData = await attrRes.json();
-    const count = attrData.Attributes.ApproximateNumberOfMessages;
+  for (const qu of queues) {
+    const name = qu.URL.split('/').pop();
+    const count = qu.Messages ? qu.Messages.length : 0;
+        // const name = url.split('/').pop();
+    // // Fetch counts for each queue
+    // const attrRes = await fetch(
+    //     `/dashboard/api/sqs/attributes?url=${encodeURIComponent(url)}`);
+    // const attrData = await attrRes.json();
+    // const count = attrData.Attributes.ApproximateNumberOfMessages;
 
     container.innerHTML += `
-            <button onclick="sqsSelectQueue('${url}', '${name}')" class="w-full text-left p-3 rounded-lg border border-neutral-800/50 hover:bg-gray-800 transition-all group">
-                <div class="text-slate-300 text-xs font-bold truncate">${name}</div>
+            <button onclick="sqsSelectQueue('${qu.URL}', '${name}')" class="w-full text-left p-3 rounded-lg border border-neutral-800/50 hover:bg-gray-800 transition-all group">
+                <div class="text-slate-300 text-sm font-bold truncate">${name}</div>
                 <div class="flex justify-between items-center mt-1">
                     <span class="text-[10px] text-gray-500">Messages</span>
-                    <span class="text-[10px] px-1.5 py-0.5 bg-orange-900/30 text-orange-400 rounded font-mono font-bold">${count}</span>
+                    <span class="text-sm px-1.5 py-0.5 bg-orange-900/30 text-orange-400 rounded font-mono font-bold">${count}</span>
                 </div>
             </button>`;
+  }
+}
+
+function sqsOpenCreateQueueModal() {
+  document.getElementById('sqs-create-queue-modal').classList.remove('hidden');
+  document.getElementById('sqs-new-queue-name').value = "";
+}
+
+function sqsCloseCreateQueueModal() {
+  document.getElementById('sqs-create-queue-modal').classList.add('hidden');
+}
+
+async function sqsPerformCreateQueue() {
+  const name = document.getElementById('sqs-new-queue-name').value;
+  const res = await fetch(`/dashboard/api/sqs/create-queue?name=${name}`, {method: 'POST'});
+  if (res.ok) {
+    sqsCloseCreateQueueModal();
+    await sqsLoadQueues();
   }
 }
 
@@ -711,11 +731,12 @@ async function sqsPurgeQueue() {
 
   try {
     const res = await fetch(
-        `/dashboard/api/sqs/purge?url=${encodeURIComponent(currentQueueUrl)}`, {
+        `/dashboard/api/sqs/purge?url=${encodeURIComponent(sqsCurrentQueueUrl)}`, {
           method: 'POST'
         });
 
     if (!res.ok) {
+      console.error(res);
       throw new Error("Failed to purge queue");
     }
 
@@ -750,15 +771,26 @@ async function sqsReceiveMessages() {
     return `
         <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-3 relative group">
             <div class="flex justify-between items-center mb-2">
-                <span class="text-[9px] text-gray-500 font-mono">ID: ${m.MessageId.substring(0, 8)}...</span>
-                <button onclick="sqsDeleteMessage('${handle}')" 
-                        class="text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity" 
-                        title="Delete Message">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+              <div class="">
+                <div onclick="openCellModal('Message ID', decodeURIComponent('${m.MessageId}'))" 
+                     class="text-[10px] text-gray-300 font-mono mb-1 cursor-pointer hover:text-orange-400 transition-colors" title="Click to expand">
+                     ID: ${m.MessageId}
+                </div>
+                <div onclick="openCellModal('Message MD5', decodeURIComponent('${m.MD5OfBody}'))" 
+                      class="text-[10px] text-gray-300 font-mono cursor-pointer hover:text-orange-400 transition-colors" title="Click to expand">
+                      MD5: ${m.MD5OfBody}
+                </div>
+              </div>
+              <button onclick="sqsDeleteMessage('${handle}')" 
+                      class="text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity" 
+                      title="Delete Message">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
                 </button>
             </div>
+            <div class="text-[10px] text-gray-300 font-mono mb-1">Data:</div>
             <pre class="text-[11px] text-orange-200 overflow-x-auto whitespace-pre-wrap">${m.Body}</pre>
         </div>
     `
@@ -787,6 +819,7 @@ async function sqsDeleteMessage(encodedHandle) {
         });
 
     if (!res.ok) {
+      console.error(res);
       throw new Error("Failed to delete message");
     }
 
@@ -813,7 +846,7 @@ async function s3LoadBuckets() {
     container.innerHTML = data.Buckets.map(b => `
         <div class="flex items-center group px-2 rounded-lg hover:bg-gray-800 transition-all">
             <button onclick="s3SelectBucket('${b.Name}', '${b.Path}')" class="flex-1 text-left py-3 text-sm flex items-center gap-2 overflow-hidden">
-                <svg class="w-5 h-5 text-yellow-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+                <svg class="w-6 h-6 text-blue-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
                 <span class="text-slate-300 truncate">${b.Name}</span>
             </button>
             
@@ -835,11 +868,10 @@ function s3ValidateBucketName(name) {
   const hint = document.getElementById('s3-bucket-hint');
 
   btn.disabled = !isValid;
-  hint.className = isValid ? "mt-2 text-[9px] text-emerald-500" : "mt-2 text-[9px] text-red-500";
+  hint.className = isValid ? "mt-2 text-[10px] text-emerald-500" : "mt-2 text-[10px] text-red-500";
 }
 
 function s3OpenCreateBucketModal() {
-  console.log('s3OpenCreateBucketModal');
   document.getElementById('s3-create-bucket-modal').classList.remove('hidden');
   document.getElementById('s3-new-bucket-name').value = "";
   s3ValidateBucketName("");
@@ -1192,7 +1224,7 @@ async function fetchOverviewData() {
         const storageGrid = document.getElementById('storage-grid');
         storageGrid.innerHTML = Object.entries(data.storage).map(([svc, size]) => `
                         <div class="bg-stone-900 border border-stone-800 p-4 rounded-2xl hover:border-stone-700 transition-colors">
-                            <div class="text-xs font-bold text-gray-400 uppercase tracking-tighter">${svc}</div>
+                            <div class="text-xs font-bold text-gray-400 tracking-tighter">${svc}</div>
                             <div class="text-2xl font-black text-white mt-2">${size}</div>
                         </div>
                     `).join('');

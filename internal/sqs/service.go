@@ -5,7 +5,9 @@ import (
 	"cloudlocal/internal/utils"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -42,11 +44,29 @@ func (svc *sqsImplementation) Handle(w http.ResponseWriter, r *http.Request, tar
 		svc.cloudwatch.Error(SERVICE, "SQSHttpHandler", fmt.Sprintf("Error parsing form: %s|%s", target, err.Error()))
 		return
 	}
-	action := r.FormValue("Action")
+
+	var action = r.FormValue("Action")
+
+	if action == "" {
+		action = strings.ReplaceAll(target, "AmazonSQS.", "")
+	}
 
 	switch action {
+	case "ListQueues":
+		queues := svc.sqs.listQueues()
+		utils.RespondJSON(w, map[string][]Queue{"Queues": queues})
 	case "CreateQueue":
 		name := r.FormValue("QueueName")
+
+		if name == "" {
+			body, _ := io.ReadAll(r.Body)
+			var req struct {
+				QueueName string `json:"QueueName"`
+			}
+			utils.UnmarshalJson(body, &req)
+			name = req.QueueName
+		}
+
 		q, err := svc.sqs.createQueue(name)
 		if err != nil {
 			utils.RespondError(utils.RespInput{
@@ -57,10 +77,21 @@ func (svc *sqsImplementation) Handle(w http.ResponseWriter, r *http.Request, tar
 			})
 			return
 		}
-		utils.RespondJSON(w, map[string]string{"QueueUrl": q.URL})
+		utils.RespondJSON(w, q)
 	case "SendMessage":
 		url := r.FormValue("QueueUrl")
 		body := r.FormValue("MessageBody")
+
+		if url == "" {
+			rbody, _ := io.ReadAll(r.Body)
+			var req struct {
+				QueueUrl    string `json:"QueueUrl"`
+				MessageBody string `json:"MessageBody"`
+			}
+			utils.UnmarshalJson(rbody, &req)
+			url = req.QueueUrl
+			body = req.MessageBody
+		}
 		msg, err := svc.sqs.sendMessage(url, body)
 		if err != nil {
 			utils.RespondError(utils.RespInput{
@@ -77,8 +108,20 @@ func (svc *sqsImplementation) Handle(w http.ResponseWriter, r *http.Request, tar
 		})
 	case "ReceiveMessage":
 		url := r.FormValue("QueueUrl")
-		maxMessages := r.FormValue("MaxNumberOfMessages")
-		msgs, err := svc.sqs.receiveMessage(url, utils.ToInt(maxMessages))
+		maxMessages := utils.ToInt(r.FormValue("MaxNumberOfMessages"))
+		if url == "" {
+			rbody, _ := io.ReadAll(r.Body)
+
+			var req struct {
+				QueueUrl            string `json:"QueueUrl"`
+				MaxNumberOfMessages int    `json:"MaxNumberOfMessages"`
+				WaitTimeSeconds     int    `json:"WaitTimeSeconds"`
+			}
+			utils.UnmarshalJson(rbody, &req)
+			url = req.QueueUrl
+			maxMessages = req.MaxNumberOfMessages
+		}
+		msgs, err := svc.sqs.receiveMessage(url, maxMessages)
 		if err != nil {
 			utils.RespondError(utils.RespInput{
 				Writer:   w,
@@ -91,8 +134,20 @@ func (svc *sqsImplementation) Handle(w http.ResponseWriter, r *http.Request, tar
 		utils.RespondJSON(w, map[string]interface{}{"Messages": msgs})
 	case "DeleteMessage":
 		url := r.FormValue("QueueUrl")
-		handle := r.FormValue("ReceiptHandle")
-		err := svc.sqs.deleteMessage(url, handle)
+		receiptHandle := r.FormValue("ReceiptHandle")
+		if url == "" {
+			rbody, _ := io.ReadAll(r.Body)
+
+			var req struct {
+				QueueUrl      string `json:"QueueUrl"`
+				ReceiptHandle string `json:"ReceiptHandle"`
+			}
+			utils.UnmarshalJson(rbody, &req)
+			url = req.QueueUrl
+			receiptHandle = req.ReceiptHandle
+		}
+
+		err := svc.sqs.deleteMessage(url, receiptHandle)
 		if err != nil {
 			utils.RespondError(utils.RespInput{
 				Writer:   w,
@@ -105,6 +160,15 @@ func (svc *sqsImplementation) Handle(w http.ResponseWriter, r *http.Request, tar
 		w.WriteHeader(http.StatusOK)
 	case "PurgeQueue":
 		url := r.FormValue("QueueUrl")
+		if url == "" {
+			rbody, _ := io.ReadAll(r.Body)
+
+			var req struct {
+				QueueUrl string `json:"QueueUrl"`
+			}
+			utils.UnmarshalJson(rbody, &req)
+			url = req.QueueUrl
+		}
 		err := svc.sqs.purgeQueue(url)
 		if err != nil {
 			utils.RespondError(utils.RespInput{
@@ -143,6 +207,7 @@ type internalSqsService interface {
 	sendMessage(queueURL, body string) (*Message, error)
 	receiveMessage(queueURL string, maxMessages int) ([]Message, error)
 	deleteMessage(queueURL, receiptHandle string) error
+	listQueues() []Queue
 	purgeQueue(queueURL string) error
 	setRedrivePolicy(queueURL string, policy *RedrivePolicy)
 }
@@ -152,6 +217,18 @@ func newSqsService(cw cloudwatch.CwService) internalSqsService {
 		cloudwatch: cw,
 		queues:     make(map[string]*Queue),
 	}
+}
+
+func (s *sqsQueueImplementation) listQueues() []Queue {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	queueList := make([]Queue, 0, len(s.queues))
+	for _, v := range s.queues {
+		queueList = append(queueList, *v)
+	}
+
+	return queueList
 }
 
 func (s *sqsQueueImplementation) createQueue(name string) (*Queue, error) {
@@ -181,18 +258,20 @@ func (s *sqsQueueImplementation) sendMessage(queueURL, body string) (*Message, e
 		return nil, fmt.Errorf("QueueNotFound")
 	}
 
+	md5 := utils.HashMd5([]byte(body))
 	msgId := fmt.Sprintf("msg-%d", time.Now().UnixNano())
-	msg := Message{
+	msg := &Message{
 		MessageId:     msgId,
 		Body:          body,
-		ReceiptHandle: msgId + "-handle",                  // Simple mock handle
-		MD5OfBody:     "7b52009b64fd0a2a49e6d8a939753077", // Placeholder MD5
+		ReceiptHandle: msgId + "-handle",
+		MD5OfBody:     md5,
 	}
 
-	queue.Messages = append(queue.Messages, msg)
+	queue.Messages = append(queue.Messages, *msg)
+	s.queues[queueURL] = queue
 	s.cloudwatch.Info(SERVICE, "SendMessage", fmt.Sprintf("SQS Message: %s", utils.MarshalIjson(msg)))
 
-	return &msg, nil
+	return msg, nil
 }
 
 func (s *sqsQueueImplementation) receiveMessage(queueURL string, maxMessages int) ([]Message, error) {
@@ -200,39 +279,48 @@ func (s *sqsQueueImplementation) receiveMessage(queueURL string, maxMessages int
 	defer s.mu.RUnlock()
 
 	queue, ok := s.queues[queueURL]
-	if !ok || len(queue.Messages) == 0 {
+
+	if !ok || queue == nil {
 		return nil, errors.New("QueueNotFound")
 	}
 
-	if maxMessages > len(queue.Messages) {
-		maxMessages = len(queue.Messages)
+	msgCount := len(queue.Messages)
+
+	if maxMessages > msgCount {
+		maxMessages = msgCount
 	}
 
 	var result []Message
 	var redrivePolicyMaxCount = -1
-	if queue.RedrivePolicy != nil && queue.RedrivePolicy.MaxReceiveCount > 0 {
-		redrivePolicyMaxCount = queue.RedrivePolicy.MaxReceiveCount
+	var deadLetterQueuePresent = false
+	if queue.RedrivePolicy != nil {
+
+		deadLetterQueuePresent = queue.RedrivePolicy.DeadLetterTargetArn != ""
+
+		if queue.RedrivePolicy.MaxReceiveCount > 0 {
+			redrivePolicyMaxCount = queue.RedrivePolicy.MaxReceiveCount
+		}
 	}
 	now := time.Now()
 
 	for i := 0; i < maxMessages; i++ {
-
-		msg := &queue.Messages[i]
+		msg := queue.Messages[i]
 
 		if isBefore(msg.VisibleAt, now) {
 			msg.ReceiveCount++
 
-			if isMoveDeadLetterQueue(msg, redrivePolicyMaxCount) {
-				s.moveToDLQ(queueURL, *msg)
+			if isMoveDeadLetterQueue(msg, deadLetterQueuePresent, redrivePolicyMaxCount) {
+				s.moveToDLQ(queueURL, msg)
 				queue.Messages = append(queue.Messages[:i], queue.Messages[i+1:]...)
 				i--
 				continue
 			}
 
 			msg.VisibleAt = now.Add(30 * time.Second)
-			result = append(result, *msg)
+			result = append(result, msg)
 		}
 	}
+	s.queues[queueURL] = queue
 	s.cloudwatch.Info(SERVICE, "ReceiveMessage", fmt.Sprintf("SQS Messages: %s", utils.MarshalIjson(map[string]any{
 		"MaxNumberOfMessages": maxMessages,
 		"QueueUrl":            queueURL,
@@ -253,13 +341,13 @@ func (s *sqsQueueImplementation) deleteMessage(queueURL, receiptHandle string) e
 
 	// Filter out the message with the matching handle
 	beforeDelete := len(queue.Messages)
-	var newMsgs []Message
+	var msgs []Message
 	for _, m := range queue.Messages {
 		if m.ReceiptHandle != receiptHandle {
-			newMsgs = append(newMsgs, m)
+			msgs = append(msgs, m)
 		}
 	}
-	queue.Messages = newMsgs
+	s.queues[queueURL].Messages = msgs
 	s.cloudwatch.Info(SERVICE, "DeleteMessage", fmt.Sprintf("Delete SQS Message: %s", utils.MarshalIjson(map[string]any{
 		"QueueUrl":                  queueURL,
 		"OldNumberOfMessages":       beforeDelete,
@@ -280,7 +368,7 @@ func (s *sqsQueueImplementation) purgeQueue(queueURL string) error {
 	noOfMsgs := len(queue.Messages)
 
 	// Efficiently clear the slice
-	queue.Messages = []Message{}
+	s.queues[queueURL].Messages = []Message{}
 	s.cloudwatch.Info(SERVICE, "PurgeQueue", fmt.Sprintf("Purged SQS Queue: %s", utils.MarshalIjson(map[string]any{
 		"QueueUrl":               queueURL,
 		"NumberOfMessagesPurged": noOfMsgs,
@@ -299,6 +387,7 @@ func (s *sqsQueueImplementation) setRedrivePolicy(queueURL string, policy *Redri
 	}
 
 	queue.RedrivePolicy = policy
+	s.queues[queueURL] = queue
 }
 
 func (s *sqsQueueImplementation) moveToDLQ(sourceUrl string, msg Message) {
@@ -319,6 +408,6 @@ func isBefore(msgTime time.Time, otherTime time.Time) bool {
 	return msgTime.Before(otherTime)
 }
 
-func isMoveDeadLetterQueue(msg *Message, redrivePolicyMaxCount int) bool {
-	return msg.ReceiveCount >= redrivePolicyMaxCount
+func isMoveDeadLetterQueue(msg Message, deadLetterQueuePresent bool, redrivePolicyMaxCount int) bool {
+	return deadLetterQueuePresent && msg.ReceiveCount >= redrivePolicyMaxCount
 }
