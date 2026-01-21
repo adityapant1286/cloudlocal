@@ -34,7 +34,8 @@ WORKDIR "$APP_HOME"
 # Combine everything into ONE layer to keep the image small
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget unzip ca-certificates libsqlite3-0 \
-    && wget -q https://s3.us-west-2.amazonaws.com/dynamodb-local/dynamodb_local_latest.zip -O /tmp/db.zip \
+    && wget -q https://d1ni2b6xgvw0s0.cloudfront.net/v2.x/dynamodb_local_latest.zip -O /tmp/db.zip \
+#    && wget -q https://s3.us-west-2.amazonaws.com/dynamodb-local/dynamodb_local_latest.zip -O /tmp/db.zip \
     && mkdir -p "$APP_HOME/dynamodb_local_latest" \
     && unzip /tmp/db.zip -d "$APP_HOME/dynamodb_local_latest" \
     && find "$APP_HOME/dynamodb_local_latest/DynamoDBLocal_lib" -name "*.dll" -delete \

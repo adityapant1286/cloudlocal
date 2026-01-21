@@ -64,12 +64,10 @@ let ddbActiveFilter = null;
 let ddbRefreshInterval = null;
 let tableSchemas = {}; // Cache for { tableName: { pk: 'id', sk: 'timestamp' } }
 
-async function selectDdbTable(tableName) {
+async function selectDdbTable(e, tableName) {
   // Highlight the selected button
-  document.querySelectorAll('.table-btn')
-  .forEach(b => b.classList.remove('bg-neutral-800', 'border-neutral-700', 'text-white'));
-  event.currentTarget.classList.add('bg-neutral-800', 'border-neutral-700',
-      'text-white');
+
+  styleSelectedElement(e,'button.cls-table-btn');
 
   currentDdbTable = tableName;
   ddbLastEvaluatedKey = null;
@@ -108,7 +106,7 @@ async function ddbLoadTables() {
     if (data !== undefined && data.TableNames !== undefined) {
 
       container.innerHTML = data.TableNames.map(name => `
-            <button onclick="selectDdbTable('${name}')" class="table-btn w-full text-left p-2 rounded-lg text-sm transition-all hover:bg-gray-800 border border-transparent hover:border-gray-700 text-gray-400 hover:text-white flex justify-between items-center group">
+            <button onclick="selectDdbTable(this, '${name}')" class="cls-table-btn w-full text-left p-2 rounded-lg text-sm transition-all hover:bg-neutral-800 border border-transparent hover:border-neutral-700 text-gray-400 hover:text-white flex justify-between items-center group">
               ${name}
               <span class="opacity-0 group-hover:opacity-100 text-[10px] text-orange-500">View →</span>
             </button>
@@ -450,22 +448,25 @@ async function loadSecrets() {
   const container = document.getElementById('sm-secrets-list');
 
   container.innerHTML = data.SecretList.map(s => `
-        <button onclick="selectSecret('${s.Name}')" class="w-full text-left px-4 py-3 rounded-lg text-sm transition-all hover:bg-gray-800 group border border-transparent hover:border-gray-700">
+        <button onclick="selectSecret(this, '${s.Name}')" class="cls-sm-secret w-full text-left px-4 py-3 rounded-lg text-sm transition-all hover:bg-neutral-800 group border border-transparent hover:border-neutral-700">
             <div class="text-slate-300 font-medium">${s.Name}</div>
             <div class="text-[10px] text-gray-300 truncate">${s.ARN}</div>
         </button>
     `).join('');
 }
 
-async function selectSecret(name) {
+async function selectSecret(e, name) {
   const res = await fetch(`/dashboard/api/secrets/get?name=${name}`);
   const data = await res.json();
 
   smCurrentSecret = name;
   smCurrentSecretValue = data.SecretString;
 
+  styleSelectedElement(e,'button.cls-sm-secret');
+
   document.getElementById('sm-secret-details').classList.remove('hidden');
   document.getElementById('sm-active-secret-name').innerText = name;
+
   document.getElementById('sm-active-secret-arn').innerText = data.ARN;
 
   const display = document.getElementById('sm-secret-value-display');
@@ -591,17 +592,47 @@ async function loadKmsKeys() {
 
   if (data && data.Keys) {
     container.innerHTML = data.Keys.map(k => `
-        <button onclick="selectKmsKey('${k.KeyId}')" class="w-full text-left px-4 py-3 rounded-lg text-sm transition-all hover:bg-gray-800 group border border-transparent hover:border-gray-700">
+        <button onclick="selectKmsKey(this, '${k.KeyId}', '${k.Arn}')" class="cls-btn-kms-key w-full text-left px-4 py-3 rounded-lg text-sm transition-all hover:bg-neutral-800 focus:bg-neutral-800 group border border-transparent hover:border-neutral-700">
             <div class="text-slate-300 font-mono text-[11px] truncate">${k.KeyId}</div>
+            <div class="text-slate-400 font-mono text-[10px] truncate">${k.Description}</div>
         </button>
     `).join('');
   }
 }
 
-function selectKmsKey(id) {
-  currentKmsKey = id;
+async function loadKmsAliases(kmsKeyId) {
+  const aliasContainer = document.getElementById('kms-active-key-aliases');
+  aliasContainer.innerHTML = '';
+  document.getElementById('kms-active-key-alias-panel').classList.add('hidden');
+  // key aliases
+  const res = await fetch(
+      `/dashboard/api/kms/list-aliases?keyId=${kmsKeyId}`, {
+        method: 'POST'
+      });
+  const data = await res.json();
+  if (data && data.Aliases) {
+    aliasContainer.innerHTML = data.Aliases.map(a =>`
+      <div class="text-slate-50 font-mono text-[11px] truncate bg-slate-700 w-fit rounded-full py-1 px-2">${a.AliasName}</div>
+    `).join('');
+    document.getElementById('kms-active-key-alias-panel').classList.remove('hidden');
+  }
+
+}
+
+async function selectKmsKey(e, kmsKeyId, kmsKeyArn) {
+  currentKmsKey = {
+    KeyId: kmsKeyId,
+    Arn: kmsKeyArn,
+  };
+
+  styleSelectedElement(e,'button.cls-btn-kms-key');
+
   document.getElementById('kms-workspace').classList.remove('hidden');
-  document.getElementById('kms-active-key-id').innerText = id;
+  document.getElementById('kms-active-key-id').innerText = kmsKeyId;
+  document.getElementById('kms-active-key-arn').innerText = kmsKeyArn;
+
+  await loadKmsAliases(kmsKeyId);
+
 }
 
 async function kmsEncrypt() {
@@ -609,7 +640,7 @@ async function kmsEncrypt() {
   const res = await fetch('/dashboard/api/kms/encrypt', {
     method: 'POST',
     body: JSON.stringify({
-      KeyId: currentKmsKey,
+      KeyId: currentKmsKey.KeyId,
       Plaintext: btoa(text) // AWS KMS expects base64 plaintext
     })
   });
@@ -632,6 +663,35 @@ async function kmsDecrypt() {
 async function createKmsKey() {
   await fetch('/dashboard/api/kms/create', {method: 'POST'});
   await loadKmsKeys();
+}
+
+function openKmsCreateAliasModel() {
+  document.getElementById('kms-create-alias-modal').classList.remove('hidden');
+  document.getElementById('kms-create-alias-key-id').innerHTML = currentKmsKey.KeyId;
+}
+
+function kmsCloseCreateAliasModal() {
+  document.getElementById('kms-create-alias-modal').classList.add('hidden');
+}
+
+async function kmsPerformCreateKmsKeyAlias() {
+  let name = document.getElementById('kms-new-alias-name').value;
+
+  if (!name.includes("/") && !name.startsWith("alias/")) {
+    name = "alias/" + name;
+  }
+
+  const res = await fetch(
+      `/dashboard/api/kms/create-alias?keyId=${encodeURIComponent(currentKmsKey.KeyId)}&name=${encodeURIComponent(name)}`,
+      {method: 'POST'}
+  );
+  if (res.ok) {
+    kmsCloseCreateAliasModal();
+    await loadKmsAliases(currentKmsKey.KeyId);
+  } else {
+    const data = await res.json();
+    document.getElementById('kms-create-alias-hint').innerText = data.message;
+  }
 }
 
 function copyKmsResult(elementId) {
@@ -674,7 +734,7 @@ async function sqsLoadQueues() {
     // const count = attrData.Attributes.ApproximateNumberOfMessages;
 
     container.innerHTML += `
-            <button onclick="sqsSelectQueue('${qu.URL}', '${name}')" class="w-full text-left p-3 rounded-lg border border-neutral-800/50 hover:bg-gray-800 transition-all group">
+            <button onclick="selectSqsQueue(this, '${qu.URL}', '${name}')" class="cls-sqs-queue w-full text-left p-3 rounded-lg border border-neutral-800/50 hover:bg-neutral-800 transition-all group">
                 <div class="text-slate-300 text-sm font-bold truncate">${name}</div>
                 <div class="flex justify-between items-center mt-1">
                     <span class="text-[10px] text-gray-500">Messages</span>
@@ -702,12 +762,14 @@ async function sqsPerformCreateQueue() {
   }
 }
 
-function sqsSelectQueue(url, name) {
+function selectSqsQueue(e, url, name) {
   sqsCurrentQueueUrl = url;
 
   // Update UI headers
   document.getElementById('sqs-active-queue-name').innerText = name;
   document.getElementById('sqs-active-queue-url').innerText = url;
+
+  styleSelectedElement(e, 'button.cls-sqs-queue');
 
   // Show the workspace and clear the previous message list
   document.getElementById('sqs-workspace').classList.remove('hidden');
@@ -819,7 +881,6 @@ async function sqsDeleteMessage(encodedHandle) {
         });
 
     if (!res.ok) {
-      console.error(res);
       throw new Error("Failed to delete message");
     }
 
@@ -844,8 +905,8 @@ async function s3LoadBuckets() {
 
   if (data && data.Buckets) {
     container.innerHTML = data.Buckets.map(b => `
-        <div class="flex items-center group px-2 rounded-lg hover:bg-gray-800 transition-all">
-            <button onclick="s3SelectBucket('${b.Name}', '${b.Path}')" class="flex-1 text-left py-3 text-sm flex items-center gap-2 overflow-hidden">
+        <div class="flex items-center group px-2 rounded-lg hover:bg-neutral-800 transition-all cls-s3-bucket-parent">
+            <button onclick="selectS3Bucket(this, '${b.Name}', '${b.Path}')" class="cls-s3-bucket flex-1 text-left py-3 text-sm flex items-center gap-2 overflow-hidden">
                 <svg class="w-6 h-6 text-blue-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
                 <span class="text-slate-300 truncate">${b.Name}</span>
             </button>
@@ -918,7 +979,7 @@ async function s3EmptyBucket() {
   }
 
   alert(`Emptied ${data.Contents.length} objects.`);
-  await s3SelectBucket(s3CurrentBucket, s3CurrentBucketPath); // Refresh view
+  await selectS3Bucket(undefined, s3CurrentBucket, s3CurrentBucketPath); // Refresh view
 }
 
 async function s3DeleteBucket(name) {
@@ -942,13 +1003,16 @@ async function s3DeleteBucket(name) {
   }
 }
 
-async function s3SelectBucket(name, path) {
+async function selectS3Bucket(e, name, path) {
   s3CurrentBucket = name;
   s3CurrentBucketPath = path;
   document.getElementById('s3-active-bucket-name').innerText = name;
   document.getElementById('s3-active-bucket-path').innerText = path;
   document.getElementById('s3-workspace').classList.remove('hidden');
 
+  if (e) {
+    styleSelectedElement(e.parentElement, 'div.cls-s3-bucket-parent');
+  }
   const res = await fetch(`/dashboard/api/s3/list-objects?bucket=${name}`);
   const data = await res.json();
   const container = document.getElementById('s3-object-list');
@@ -961,7 +1025,7 @@ async function s3SelectBucket(name, path) {
   container.innerHTML = data.Contents.map(obj => {
     const safeKey = encodeURIComponent(obj.Key);
     return `
-        <tr class="hover:bg-gray-800/30 group border-b border-neutral-800/50 transition-colors">
+        <tr class="hover:bg-neutral-800/30 group border-b border-neutral-800/50 transition-colors">
         <td class="p-3">
             <button onclick="s3ViewObject('${safeKey}')" 
                     class="text-blue-400 hover:text-blue-300 hover:underline text-left transition-colors">
@@ -1016,7 +1080,7 @@ async function s3PerformUpload() {
 
     s3CloseUploadModal();
 
-    await s3SelectBucket(s3CurrentBucket, s3CurrentBucketPath); // Refresh the list
+    await selectS3Bucket(undefined, s3CurrentBucket, s3CurrentBucketPath); // Refresh the list
 
   } catch (err) {
     alert(err.message);
@@ -1039,7 +1103,7 @@ async function s3DeleteObject(key) {
       throw new Error("Delete failed");
     }
 
-    await s3SelectBucket(s3CurrentBucket, s3CurrentBucketPath); // Refresh the list
+    await selectS3Bucket(undefined, s3CurrentBucket, s3CurrentBucketPath); // Refresh the list
 
   } catch (err) {
     alert(err.message);
@@ -1069,33 +1133,38 @@ async function cwLoadLogGroups() {
 
   if (data && data.logGroups) {
     container.innerHTML = data.logGroups.map(g => `
-        <button onclick="cwSelectLogGroup('${g.logGroupName}')" class="w-full text-left px-3 py-2 rounded-md text-xs transition-all hover:bg-gray-800 text-slate-400 hover:text-white truncate">
+        <button onclick="selectCwLogGroup(this, '${g.logGroupName}')" class="cls-cw-log-group w-full text-left px-3 py-2 rounded-md text-xs transition-all hover:bg-neutral-800 text-slate-300 hover:text-white truncate">
             ${g.logGroupName}
         </button>
     `).join('');
   }
 }
 
-async function cwSelectLogGroup(groupName) {
+async function selectCwLogGroup(e, groupName) {
   cwCurrentLogGroup = groupName;
   document.getElementById('cw-streams-panel').classList.remove('hidden');
   document.getElementById('cw-events-panel').classList.add('hidden');
+
+  styleSelectedElement(e,'button.cls-cw-log-group');
 
   const res = await fetch(`/dashboard/api/logs/streams?group=${encodeURIComponent(groupName)}`);
   const data = await res.json();
   const container = document.getElementById('cw-stream-list');
 
   container.innerHTML = data.logStreams.map(s => `
-        <button onclick="cwSelectLogStream('${s.logStreamName}')" class="w-full text-left px-3 py-2 rounded-md text-[11px] transition-all hover:bg-gray-800 text-slate-300 hover:text-orange-400 truncate font-mono">
+        <button onclick="selectCwLogStream(this, '${s.logStreamName}')" class="cls-cw-log-group-stream w-full text-left px-3 py-2 rounded-md text-[11px] transition-all hover:bg-neutral-800 text-slate-300 hover:text-orange-400 truncate font-mono">
             ${s.logStreamName}
         </button>
     `).join('');
 }
 
-async function cwSelectLogStream(streamName) {
+async function selectCwLogStream(e, streamName) {
   cwCurrentLogStream = streamName;
   document.getElementById('cw-events-panel').classList.remove('hidden');
   document.getElementById('active-stream-name').innerText = streamName;
+
+  styleSelectedElement(e, 'button.cls-cw-log-group-stream');
+
   await cwRefreshLogs();
 }
 
@@ -1315,6 +1384,12 @@ function switchLog() {
   eventSource.onerror = function () {
     console.error("Log stream lost. Reconnecting...");
   };
+}
+
+function styleSelectedElement(e, selector) {
+  document.querySelectorAll(selector)
+  .forEach(b => b.classList.remove('bg-neutral-800', 'border-neutral-700', 'text-white'));
+  e.classList.add('bg-neutral-800', 'border-neutral-700', 'text-white');
 }
 
 // Initialize with Edge logs

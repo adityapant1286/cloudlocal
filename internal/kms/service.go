@@ -33,8 +33,13 @@ func NewKmsService() utils.ServiceHandler {
 func (svc *kmsServiceImplementation) Handle(w http.ResponseWriter, r *http.Request, target string) {
 	body, _ := io.ReadAll(r.Body)
 
-	// Route based on Target Header
-	if strings.HasSuffix(target, "DescribeKey") {
+	var action = r.FormValue("Action")
+	if action == "" {
+		action = strings.ReplaceAll(target, "TrentService.", "")
+	}
+
+	switch action {
+	case "DescribeKey":
 		var req struct {
 			KeyId string `json:"KeyId"`
 		}
@@ -48,9 +53,7 @@ func (svc *kmsServiceImplementation) Handle(w http.ResponseWriter, r *http.Reque
 		}
 
 		utils.RespondJSON(w, map[string]interface{}{"KeyMetadata": key})
-		return
-
-	} else if strings.HasSuffix(target, "CreateAlias") {
+	case "CreateAlias":
 		var req struct {
 			AliasName   string `json:"AliasName"`
 			TargetKeyId string `json:"TargetKeyId"`
@@ -60,13 +63,12 @@ func (svc *kmsServiceImplementation) Handle(w http.ResponseWriter, r *http.Reque
 		err := svc.kms.createAlias(req.AliasName, req.TargetKeyId)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
+			utils.RespondJSON(w, map[string]interface{}{"message": err.Error()})
 			return
 		}
 		// AWS returns 200 OK with no body for CreateAlias
 		w.WriteHeader(http.StatusOK)
-
-	} else if strings.HasSuffix(target, "CreateKey") {
-
+	case "CreateKey":
 		var req struct {
 			Description string
 		}
@@ -74,9 +76,7 @@ func (svc *kmsServiceImplementation) Handle(w http.ResponseWriter, r *http.Reque
 
 		key, _ := svc.kms.createKey(req.Description)
 		utils.RespondJSON(w, map[string]interface{}{"KeyMetadata": key})
-
-	} else if strings.HasSuffix(target, "Encrypt") {
-
+	case "Encrypt":
 		var req struct {
 			KeyId     string
 			Plaintext []byte
@@ -84,18 +84,20 @@ func (svc *kmsServiceImplementation) Handle(w http.ResponseWriter, r *http.Reque
 		utils.UnmarshalJson(body, &req)
 		blob, _ := svc.kms.encrypt(svc.kms.resolveKeyId(req.KeyId), req.Plaintext)
 		utils.RespondJSON(w, map[string]string{"CiphertextBlob": blob})
-
-	} else if strings.HasSuffix(target, "Decrypt") {
-
+	case "Decrypt":
 		var req struct{ CiphertextBlob string }
 		utils.UnmarshalJson(body, &req)
 		plain, _ := svc.kms.decrypt(req.CiphertextBlob)
 		utils.RespondJSON(w, map[string]interface{}{"Plaintext": plain})
+	case "ListAliases":
+		var req struct {
+			KeyId string `json:"KeyId"`
+		}
+		utils.UnmarshalJson(body, &req)
 
-	} else if strings.HasSuffix(target, "ListAliases") {
-		aliases, _ := svc.kms.listAliases()
+		aliases, _ := svc.kms.listAliases(req.KeyId)
 		utils.RespondJSON(w, map[string]interface{}{"Aliases": aliases})
-	} else if strings.HasSuffix(target, "ListKeys") {
+	case "ListKeys":
 		keys, _ := svc.kms.listKeys()
 		utils.RespondJSON(w, map[string]interface{}{"Keys": keys})
 	}
@@ -107,7 +109,7 @@ type internalKms interface {
 	decrypt(ciphertextBlob string) ([]byte, error)
 	describeKey(keyIdOrAlias string) (*KmsKey, error)
 	encrypt(keyId string, plaintext []byte) (string, error)
-	listAliases() ([]Alias, error)
+	listAliases(keyId string) ([]Alias, error)
 	listKeys() ([]KmsKey, error)
 	resolveKeyId(idOrAlias string) string
 }
@@ -165,7 +167,7 @@ func (s *kmsImplementation) createAlias(aliasName string, targetKeyID string) er
 
 	// In AWS, aliases must start with "alias/"
 	if !strings.HasPrefix(aliasName, "alias/") {
-		return errors.New("InvalidAliasNameException: Alias must start with alias/")
+		return errors.New("alias must start with 'alias/'")
 	}
 
 	// Basic check: does the key exist? (optional for mock but helpful)
@@ -274,13 +276,21 @@ func (s *kmsImplementation) encrypt(keyId string, plaintext []byte) (string, err
 	return result, nil
 }
 
-func (s *kmsImplementation) listAliases() ([]Alias, error) {
+func (s *kmsImplementation) listAliases(keyId string) ([]Alias, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	var result []Alias
-	for name, keyId := range s.aliases {
-		result = append(result, Alias{AliasName: name, TargetKeyId: keyId})
+	if keyId != "" {
+		for name, kId := range s.aliases {
+			if keyId == kId {
+				result = append(result, Alias{AliasName: name, TargetKeyId: kId})
+			}
+		}
+	} else {
+		for name, kId := range s.aliases {
+			result = append(result, Alias{AliasName: name, TargetKeyId: kId})
+		}
 	}
 	s.cloudwatch.Info(SERVICE, "ListAliases", fmt.Sprintf("KMS aliases: %s", utils.MarshalIjson(result)))
 	return result, nil

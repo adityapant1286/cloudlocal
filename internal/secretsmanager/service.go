@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"maps"
 	"net/http"
 	"os"
@@ -31,7 +32,18 @@ func NewSecretManagerService() utils.ServiceHandler {
 func (svc *smImplementation) Handle(w http.ResponseWriter, r *http.Request, target string) {
 	body, _ := io.ReadAll(r.Body)
 
-	if strings.HasSuffix(target, "CreateSecret") {
+	log.Printf("url: %v", r.URL)
+	log.Printf("header: %v", r.Header)
+	log.Printf("target: %v", target)
+	log.Printf("body: %v", body)
+
+	var action = r.FormValue("Action")
+	if action == "" {
+		action = strings.ReplaceAll(target, "secretsmanager.", "")
+	}
+
+	switch action {
+	case "CreateSecret":
 		var req struct {
 			Name         string `json:"Name"`
 			SecretString string `json:"SecretString"`
@@ -49,8 +61,7 @@ func (svc *smImplementation) Handle(w http.ResponseWriter, r *http.Request, targ
 			return
 		}
 		utils.RespondJSON(w, secret)
-
-	} else if strings.HasSuffix(target, "GetSecretValue") {
+	case "GetSecretValue":
 		var req struct{ SecretId string }
 		utils.UnmarshalJson(body, &req)
 		secret, err := svc.sm.getSecretValue(req.SecretId)
@@ -64,7 +75,7 @@ func (svc *smImplementation) Handle(w http.ResponseWriter, r *http.Request, targ
 			return
 		}
 		utils.RespondJSON(w, secret)
-	} else if strings.HasSuffix(target, "UpdateSecret") {
+	case "UpdateSecret":
 		var req struct {
 			SecretId     string
 			SecretString string
@@ -82,8 +93,7 @@ func (svc *smImplementation) Handle(w http.ResponseWriter, r *http.Request, targ
 		}
 		// AWS returns ARN and Name on update
 		utils.RespondJSON(w, map[string]string{"Name": req.SecretId})
-
-	} else if strings.HasSuffix(target, "DeleteSecret") {
+	case "DeleteSecret":
 		var req struct {
 			SecretId string `json:"SecretId"`
 		}
@@ -98,9 +108,11 @@ func (svc *smImplementation) Handle(w http.ResponseWriter, r *http.Request, targ
 			})
 			return
 		}
-		utils.RespondJSON(w, map[string]string{"Name": req.SecretId, "DeletionDate": fmt.Sprintf("%d", time.Now().Unix())})
-
-	} else if strings.HasSuffix(target, "DescribeSecret") {
+		utils.RespondJSON(w, map[string]string{
+			"Name":         req.SecretId,
+			"DeletionDate": fmt.Sprintf("%d", time.Now().Unix()),
+		})
+	case "DescribeSecret":
 		var req struct {
 			SecretId string `json:"SecretId"`
 		}
@@ -116,8 +128,7 @@ func (svc *smImplementation) Handle(w http.ResponseWriter, r *http.Request, targ
 			return
 		}
 		utils.RespondJSON(w, secret)
-
-	} else if strings.HasSuffix(target, "ListSecrets") {
+	case "ListSecrets":
 		var req struct {
 			Filters   []Filter `json:"Filters"`
 			SortBy    string   `json:"SortBy"`
@@ -137,6 +148,7 @@ func (svc *smImplementation) Handle(w http.ResponseWriter, r *http.Request, targ
 		utils.RespondJSON(w, map[string]interface{}{
 			"SecretList": secrets,
 		})
+
 	}
 }
 

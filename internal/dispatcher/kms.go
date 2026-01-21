@@ -3,7 +3,9 @@ package dispatcher
 import (
 	"bytes"
 	"cloudlocal/internal/utils"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -11,10 +13,21 @@ func (d *Dispatcher) HandleKMSAdmin(w http.ResponseWriter, r *http.Request) {
 	action := ""
 	var payload []byte
 
+	log.Printf("HandleKMSAdmin: %v", r.URL)
+
 	switch r.URL.Path {
 	case "/dashboard/api/kms/list":
 		action = "ListKeys"
 		payload = []byte("{}")
+	case "/dashboard/api/kms/create-alias":
+		keyId := r.URL.Query().Get("keyId")
+		name := r.URL.Query().Get("name")
+		action = "CreateAlias"
+		payload = []byte(fmt.Sprintf(`{"TargetKeyId": "%s", "AliasName": "%s"}`, keyId, name))
+	case "/dashboard/api/kms/list-aliases":
+		keyId := r.URL.Query().Get("keyId")
+		action = "ListAliases"
+		payload = []byte(fmt.Sprintf(`{"KeyId": "%s"}`, keyId))
 	case "/dashboard/api/kms/create":
 		action = "CreateKey"
 		payload = []byte(`{"Description": "Created via CloudLocal Dashboard"}`)
