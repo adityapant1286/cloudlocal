@@ -53,6 +53,7 @@ var S3OwnerId = strings.ToLower(GetEnv("S3_OWNER_ID", "cloudlocal-s3-owner-id"))
 var DashboardEnabled = GetEnv("DISABLE_DASHBOARD", "false") != "true"
 var LogDir = VolumeDir + "/logs"
 var SnsActions = map[string]bool{"Publish": true, "CreateTopic": true, "Subscribe": true, "ListTopics": true}
+var LambdaDir = VolumeDir + "/lambda"
 
 type ServiceHandler interface {
 	Handle(w http.ResponseWriter, r *http.Request, target string)
@@ -116,8 +117,8 @@ func GenAlphanumeric(length int) string {
 }
 
 func RandomUuid() string {
-	s := "1234abcd-1ABC-1234-abcd-%s"
-	return fmt.Sprintf(s, GenAlphanumeric(12))
+	s := "1234abcd-1ABC-1234-%s-%s"
+	return fmt.Sprintf(s, GenAlphanumeric(4), GenAlphanumeric(12))
 }
 
 /*

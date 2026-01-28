@@ -56,7 +56,6 @@ func ProbeInternalServices(cw cloudwatch.CwService, enabledServices string) []Se
 			Id: "sqs", Name: "SQS", Healthy: true, Port: 10050, Type: "Native",
 		})
 	}
-
 	if contains(enabledServices, "sns") {
 		stats = append(stats, ServiceStatus{
 			Id: "sns", Name: "SNS", Healthy: true, Port: 10050, Type: "Native",

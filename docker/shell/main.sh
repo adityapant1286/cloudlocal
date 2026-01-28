@@ -8,15 +8,20 @@ SERVICES="${SERVICES,,}" # Lowercase for easier matching
 SERVICES="${SERVICES// /}" # Remove all spaces for easier matching
 
 PIDS=() # Array to keep track of all service PIDs
+RED_L='\033[1;31m'
+GREEN_L='\033[1;32m'
+GRAY_D='\033[1;30m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
 # Function to stop all background processes gracefully
 cleanup() {
-  echo -e "\n[Shutdown] Gracefully terminating Cloudlocal..."
+  echo -e "\n[${YELLOW}Shutdown${NC}] Gracefully terminating Cloudlocal..."
     for pid in "${PIDS[@]}"; do
         kill -TERM "$pid" 2>/dev/null
     done
   wait
-  echo "[Shutdown] All services of Cloudlocal cleaned up."
+  echo "[${GRAY_D}Shutdown${NC}] All services of Cloudlocal cleaned up."
   exit 0
 }
 
@@ -66,8 +71,44 @@ edge_dispatcher() {
   PIDS+=($!)
 }
 
+check_supported_runtime() {
+
+  if command -v java >/dev/null; then
+      echo -e "[${GREEN_L}OK${NC}] Java: $(java -version 2>&1 | head -n 1)"
+  else
+      echo -e "[${RED_L}FAIL${NC}] Java not found"
+  fi
+
+  # Check Node
+  if command -v node >/dev/null; then
+      echo -e "[${GREEN_L}OK${NC}] Node: $(node -v)"
+  else
+      echo -e "[${RED_L}FAIL${NC}] Node not found"
+  fi
+
+  # Check Python
+  if command -v python3 >/dev/null; then
+      # This also checks if the shared library (.so) is linked correctly
+      echo -e "[${GREEN_L}OK${NC}] Python: $(python3 --version)"
+  else
+      echo -e "[${RED_L}FAIL${NC}] Python not found or library link broken"
+  fi
+
+  # Check Go (Your CloudLocal binary)
+  if [ -f "/opt/cloudlocal/cloudlocal-edge" ]; then
+      echo -e "[${GREEN_L}OK${NC}] CloudLocal Edge Binary found"
+  else
+      echo -e "[${RED_L}FAIL${NC}] CloudLocal Edge Binary missing"
+  fi
+
+}
+
 if contains_service "dynamodb"; then
   dynamodb_service
+fi
+
+if contains_service "lambda"; then
+  check_supported_runtime
 fi
 
 if [ ${#PIDS[@]} -gt 0 ]; then
@@ -77,12 +118,12 @@ fi
 
 # --- Keep alive ---
 if [ ${#PIDS[@]} -eq 0 ]; then
-  echo "No services were enabled. Check ENABLED_SERVICES env var."
+  echo -e "No services were enabled. Check ENABLED_SERVICES env var."
   exit 1
 fi
 
-echo "CloudLocal is up and running on port 10050..."
-echo "Press Ctrl+C to shut down."
+echo -e "CloudLocal is up and running on port 10050..."
+echo -e "Press Ctrl+C to shut down."
 
 # Wait for all background processes.
 wait

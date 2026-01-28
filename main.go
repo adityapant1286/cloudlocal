@@ -4,6 +4,7 @@ import (
 	"cloudlocal/internal/cloudwatch"
 	"cloudlocal/internal/dispatcher"
 	"cloudlocal/internal/kms"
+	"cloudlocal/internal/lambda"
 	"cloudlocal/internal/s3"
 	"cloudlocal/internal/secretsmanager"
 	"cloudlocal/internal/sns"
@@ -27,15 +28,16 @@ func main() {
 	sqsService := sqs.NewSQSService()
 
 	appDispatcher := &dispatcher.Dispatcher{
-		KmsSvc: kms.NewKmsService(),
-		SmSvc:  secretsmanager.NewSecretManagerService(),
-		SqsSvc: sqsService,
-		S3Svc:  s3.NewS3Service(),
-		SnsSvc: sns.NewSnsService(sqsService),
-		StsSvc: sts.NewStsService(),
-		CwSvc:  cw,
-		UI:     uiFiles,
-		Proxy:  createDynamoProxy(),
+		KmsSvc:    kms.NewKmsService(),
+		SmSvc:     secretsmanager.NewSecretManagerService(),
+		SqsSvc:    sqsService,
+		S3Svc:     s3.NewS3Service(),
+		SnsSvc:    sns.NewSnsService(sqsService),
+		StsSvc:    sts.NewStsService(),
+		LambdaSvc: lambda.NewLambdaService(),
+		CwSvc:     cw,
+		UI:        uiFiles,
+		Proxy:     createDynamoProxy(),
 	}
 
 	cw.Info("CloudLocal", "Startup", fmt.Sprintf("CloudLocal Edge listening on :%s...", utils.Port))

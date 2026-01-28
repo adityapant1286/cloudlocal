@@ -5,11 +5,13 @@ services:
     init: true
     build:
       context: ./
+      no_cache: true
+#      dockerfile: ./docker/Dockerfile_b4_lambda
       dockerfile: ./docker/Dockerfile
     ports:
       - "10050-10070:10050-10070"
     environment:
-      - ENABLED_SERVICES=dynamodb,s3,sqs,kms,secretsmanager
+      - ENABLED_SERVICES=dynamodb,s3,sqs,kms,secretsmanager,lambda
       - CLOUDWATCH_CONSOLE_LOG=true
 #      - DEBUG_LOG=true
       - AWS_ENDPOINT_OVERRIDE=http://cloudlocal:10050

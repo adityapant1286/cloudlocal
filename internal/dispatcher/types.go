@@ -15,15 +15,16 @@ import (
 const SERVICE = "dispatcher-service"
 
 type Dispatcher struct {
-	KmsSvc utils.ServiceHandler
-	SmSvc  utils.ServiceHandler
-	SqsSvc sqs.ServiceHandler
-	S3Svc  s3.ServiceHandler
-	SnsSvc sns.ServiceHandler
-	StsSvc sts.ServiceHandler
-	CwSvc  cloudwatch.CwService
-	UI     embed.FS
-	Proxy  http.Handler // DynamoDB Proxy
+	KmsSvc    utils.ServiceHandler
+	SmSvc     utils.ServiceHandler
+	SqsSvc    sqs.ServiceHandler
+	S3Svc     s3.ServiceHandler
+	SnsSvc    sns.ServiceHandler
+	StsSvc    sts.ServiceHandler
+	LambdaSvc utils.ServiceHandler
+	CwSvc     cloudwatch.CwService
+	UI        embed.FS
+	Proxy     http.Handler // DynamoDB Proxy
 }
 
 type CombinedStatus struct {
