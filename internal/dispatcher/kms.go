@@ -51,7 +51,7 @@ func (d *Dispatcher) ProxyToKMS(w http.ResponseWriter, action string, payload []
 
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
 	req.Header.Set("X-Amz-Target", "TrentService."+action) // KMS uses "TrentService"
-	req.Header.Set("x-amz-date", "20260101T000000Z")
+	req.Header.Set("x-amz-date", utils.XAmzDate())
 	req.Header.Set("Authorization", utils.ApiAuthHeader("kms"))
 
 	client := &http.Client{}

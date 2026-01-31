@@ -100,7 +100,7 @@ func (d *Dispatcher) ProxyToS3(input proxyS3Input) {
 	req, _ := http.NewRequest(input.method, input.url, input.reader)
 	//req.Header.Set("Content-Type", "application/x-amz-json-1.1")
 	req.Header.Set("X-Amz-Target", "AmazonS3."+input.action)
-	req.Header.Set("x-amz-date", "20260101T000000Z")
+	req.Header.Set("x-amz-date", utils.XAmzDate())
 	req.Header.Set("Authorization", utils.ApiAuthHeader("s3"))
 
 	writer := input.writer
@@ -128,30 +128,3 @@ func (d *Dispatcher) ProxyToS3(input proxyS3Input) {
 		return
 	}
 }
-
-/*
-func (d *Dispatcher) ProxyToS3(w http.ResponseWriter, method string, action string, payload []byte) {
-	req, _ := http.NewRequest(method, utils.CloudLocalUrl, bytes.NewBuffer(payload))
-	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
-	req.Header.Set("X-Amz-Target", "AmazonS3."+action)
-	req.Header.Set("x-amz-date", "20260101T000000Z")
-	req.Header.Set("Authorization", utils.ApiAuthHeader("s3"))
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		http.Error(w, "S3 Proxy Error: "+err.Error(), 500)
-		return
-	}
-	defer resp.Body.Close()
-
-	// Forward the DynamoDB response back to the Dashboard
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-	_, err = io.Copy(w, resp.Body)
-	if err != nil {
-		http.Error(w, "S3 Proxy Copy Error: "+err.Error(), 500)
-		return
-	}
-}
-*/

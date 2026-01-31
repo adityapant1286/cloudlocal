@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"maps"
 	"net/http"
 	"os"
@@ -32,10 +31,10 @@ func NewSecretManagerService() utils.ServiceHandler {
 func (svc *smImplementation) Handle(w http.ResponseWriter, r *http.Request, target string) {
 	body, _ := io.ReadAll(r.Body)
 
-	log.Printf("url: %v", r.URL)
-	log.Printf("header: %v", r.Header)
-	log.Printf("target: %v", target)
-	log.Printf("body: %v", body)
+	//log.Printf("url: %v", r.URL)
+	//log.Printf("header: %v", r.Header)
+	//log.Printf("target: %v", target)
+	//log.Printf("body: %v", body)
 
 	var action = r.FormValue("Action")
 	if action == "" {

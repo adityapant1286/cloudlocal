@@ -63,6 +63,11 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			if strings.HasPrefix(r.URL.Path, "/dashboard/api/lambda") {
+				d.HandleLambdasAdmin(w, r)
+				return
+			}
+
 			if strings.HasPrefix(r.URL.Path, "/dashboard/api/logs") {
 				d.HandleCloudWatchAdmin(w, r)
 				return
@@ -119,7 +124,8 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.LambdaSvc != nil &&
-		strings.HasPrefix(r.URL.Path, "/2015-03-31/functions") {
+		(strings.HasPrefix(r.URL.Path, "/2015-03-31/functions") ||
+			strings.HasPrefix(amzTarget, "lambda")) {
 
 		d.LambdaSvc.Handle(w, r, amzTarget)
 

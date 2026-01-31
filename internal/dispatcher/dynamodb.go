@@ -51,7 +51,7 @@ func (d *Dispatcher) ProxyToDynamo(w http.ResponseWriter, action string, payload
 	// Crucial: DynamoDB Local requires these specific headers
 	req.Header.Set("Content-Type", "application/x-amz-json-1.0")
 	req.Header.Set("X-Amz-Target", "DynamoDB_20120810."+action)
-	req.Header.Set("x-amz-date", "20260101T000000Z")
+	req.Header.Set("x-amz-date", utils.XAmzDate())
 	req.Header.Set("Authorization", utils.ApiAuthHeader("dynamodb"))
 
 	client := &http.Client{}

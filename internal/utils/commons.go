@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var DefaultDir = "/opt/cloudlocal-data"
@@ -247,4 +248,9 @@ func SortArr[T any](arr []T, compare func(T, T) bool) []T {
 		return compare(arr[i], arr[j])
 	})
 	return arr
+}
+
+func XAmzDate() string {
+	utcYYYYMMDD := time.Now().UTC().Format("20061001")
+	return utcYYYYMMDD + "T000000Z"
 }

@@ -8,13 +8,16 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -41,6 +44,29 @@ func (svc *lambdaServiceImplementation) Handle(w http.ResponseWriter, r *http.Re
 	}
 
 	userAgent := r.Header.Get("User-Agent")
+	urlPath := r.URL.Path
+
+	if strings.Contains(target, "ListLambda") {
+		functions := svc.lambda.listFunctions()
+		w.WriteHeader(http.StatusOK)
+		utils.RespondJSON(w, functions)
+		return
+	} else if strings.Contains(target, "DescribeLambda") {
+		var req struct{ FunctionName string }
+		utils.UnmarshalJson(body, &req)
+
+		function, err := svc.lambda.describeFunction(req.FunctionName)
+		if err != nil {
+			utils.RespondError(utils.RespInput{
+				Writer:   w,
+				Code:     http.StatusNotFound,
+				ErrorStr: "ResourceNotFoundException",
+				Data:     map[string]string{"message": err.Error()},
+			})
+			return
+		}
+		utils.RespondJSON(w, function)
+	}
 
 	if strings.Contains(userAgent, "lambda.create-function") {
 
@@ -55,9 +81,8 @@ func (svc *lambdaServiceImplementation) Handle(w http.ResponseWriter, r *http.Re
 		return
 
 	} else if strings.Contains(userAgent, "lambda.invoke") {
-		path := r.URL.Path
 
-		functionPath := strings.ReplaceAll(path, "/invocations", "")
+		functionPath := strings.ReplaceAll(urlPath, "/invocations", "")
 		functionName := functionPath[strings.LastIndex(functionPath, "/")+1:]
 
 		payload := string(body)
@@ -98,6 +123,8 @@ func (svc *lambdaServiceImplementation) Handle(w http.ResponseWriter, r *http.Re
 }
 
 type internalLambda interface {
+	listFunctions() []*FunctionConfig
+	describeFunction(functionName string) (*FunctionConfig, error)
 	createFunction(body []byte) (*FunctionConfig, error)
 	invokeLocal(req InvokeRequest) (string, error)
 }
@@ -145,6 +172,31 @@ func (s *lambdaSvcImplementation) load() {
 	if err := utils.UnmarshalJsonErrors(data, &state); err == nil {
 		s.functions = state.Functions
 	}
+}
+
+func (s *lambdaSvcImplementation) listFunctions() []*FunctionConfig {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	values := slices.Collect(maps.Values(s.functions))
+
+	s.cw.Info(SERVICE, "ListFunctions", fmt.Sprintf("List functions: %s", utils.MarshalIjson(values)))
+
+	return values
+}
+
+func (s *lambdaSvcImplementation) describeFunction(functionName string) (*FunctionConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	val, ok := s.functions[functionName]
+	if !ok {
+		return nil, errors.New("ResourceNotFoundException")
+	}
+
+	s.cw.Info(SERVICE, "DescribeFunction", fmt.Sprintf("Retrieved function: %s", utils.MarshalIjson(val)))
+
+	return val, nil
 }
 
 func (s *lambdaSvcImplementation) createFunction(body []byte) (*FunctionConfig, error) {
