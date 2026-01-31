@@ -218,11 +218,11 @@ func (s *lambdaSvcImplementation) invokeLocal(req InvokeRequest) (string, error)
 	case "nodejs25.x":
 		cmd = s.node(ctx, functionConfig, req)
 
-	case "java21":
-		cmd = s.java(ctx, functionConfig, req)
-
-	case "java":
-		cmd = s.java(ctx, functionConfig, req)
+	//case "java21":
+	//	cmd = s.java(ctx, functionConfig, req)
+	//
+	//case "java":
+	//	cmd = s.java(ctx, functionConfig, req)
 
 	default:
 		return "", fmt.Errorf("runtime %s not supported yet", functionConfig.Runtime)
@@ -270,11 +270,13 @@ func (s *lambdaSvcImplementation) node(ctx context.Context, config *FunctionConf
 }
 
 func (s *lambdaSvcImplementation) java(ctx context.Context, config *FunctionConfig, req InvokeRequest) *exec.Cmd {
+	// The Java based lambda function execution does not work.
+	// Need different strategy for Java functions.
 	return exec.CommandContext(
 		ctx,
 		"java",
 		"-jar",
-		utils.LambdaDir+"/"+config.FunctionName+".jar",
+		utils.LambdaDir+"/"+config.FunctionName+"/"+config.FunctionName+".jar",
 		req.Payload,
 	)
 }
