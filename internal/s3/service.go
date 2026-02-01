@@ -4,6 +4,7 @@ import (
 	"cloudlocal/internal/cloudwatch"
 	"cloudlocal/internal/utils"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -301,7 +302,12 @@ func (s *s3Implementation) createBucket(name string) error {
 func (s *s3Implementation) deleteBucket(name string) error {
 	bucketPath := filepath.Join(s.storagePath, name)
 
-	s.cloudwatch.Info(SERVICE, "DeleteBucket", fmt.Sprintf("Deleting S3 bucket: %s", utils.MarshalIjson(s.buckets[name])))
+	bucket, ok := s.buckets[name]
+	if !ok {
+		return errors.New("ResourceNotFoundException")
+	}
+
+	s.cloudwatch.Info(SERVICE, "DeleteBucket", fmt.Sprintf("Deleting S3 bucket: %s", utils.MarshalIjson(bucket)))
 
 	delete(s.buckets, name)
 	return os.RemoveAll(bucketPath)

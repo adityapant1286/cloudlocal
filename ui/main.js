@@ -1122,6 +1122,156 @@ async function s3ViewObject(key) {
   openCellModal(`S3: ${key}`, content);
 }
 
+let lambdaCurrentFunction = null;
+
+async function lambdaLoadFunctions() {
+  const res = await fetch('/dashboard/api/lambda/list');
+  const data = await res.json();
+  const container = document.getElementById('lambda-function-list');
+
+  if (data && data.Functions) {
+    container.innerHTML = data.Functions.map(f => `
+        <div class="flex items-center group px-2 rounded-lg hover:bg-neutral-800 transition-all cls-s3-bucket-parent">
+            <button onclick="lambdaSelectFunction(this, '${f}')" class="cls-btn-lambda-func flex-1 text-left py-3 text-sm flex items-center gap-2 overflow-hidden">
+                <svg class="w-6 h-6 text-blue-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+                <span class="text-slate-300 truncate">${f.FunctionName}</span>
+            </button>
+            
+            <button onclick="lambdaDeleteFunction('${f.FunctionName}')" class="p-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+            </button>
+        </div>
+    `).join('');
+  }
+}
+
+async function lambdaSelectFunction(e, lambdaFunction) {
+  lambdaCurrentFunction = lambdaFunction;
+
+  styleSelectedElement(e,'button.cls-btn-lambda-func');
+
+  document.getElementById('lambda-workspace').classList.remove('hidden');
+  document.getElementById('lambda-active-function-name').innerText = lambdaFunction.FunctionName;
+  // document.getElementById('lambda-active-function-arn').innerText = lambdaFunction.FunctionArn;
+
+  const lambdaFunctionGrid = document.getElementById('lambda-active-function-panel');
+  lambdaFunctionGrid.innerHTML = Object.entries(lambdaFunction).map(([k, v]) => `
+                        <div class="bg-stone-900 border border-stone-800 p-4 rounded-2xl hover:border-stone-700 transition-colors">
+                            <div class="text-base font-bold text-gray-400 tracking-tighter">${k}</div>
+                            <div class="text-md font-black text-white mt-2">${v}</div>
+                        </div>
+                    `).join('');
+
+}
+
+async function lambdaDeleteFunction(functionName) {
+
+  if (functionName === undefined) {
+    functionName = lambdaCurrentFunction.FunctionName;
+  }
+
+  if (!confirm(`Delete function "${functionName}"?`)) {
+    return;
+  }
+
+  const res = await fetch(
+      `/dashboard/api/lambda/delete?name=${encodeURIComponent(functionName)}`,
+      {method: 'POST'}
+  );
+  if (res.ok) {
+    if (lambdaCurrentFunction.FunctionName === functionName) {
+      document.getElementById('lambda-workspace').classList.add('hidden');
+      lambdaCurrentFunction = null;
+    }
+    await lambdaLoadFunctions();
+  } else {
+    const err = await res.json();
+    alert(`Error: ${err.Message || "Functions might not be exists"}`);
+  }
+
+}
+
+function lambdaOpenCreateFunctionModal() {
+  document.getElementById('lambda-create-modal').classList.remove('hidden');
+  document.getElementById('lambda-function-name').value = "";
+  document.getElementById('lambda-runtime-selector').selectedIndex = 0;
+  document.getElementById('lambda-function-handler').value = "";
+  document.getElementById('lambda-code-upload').value = "";
+}
+
+function lambdaCloseCreateFunctionModal() {
+  document.getElementById('lambda-create-modal').classList.add('hidden');
+}
+
+function onLambdaFunctionNameInput(e) {
+  const functionName = e.value;
+
+  const regex = /^[a-zA-Z][a-zA-Z0-9_-]*?$/;
+  const isValid = regex.test(functionName) && !functionName.includes('..');
+  const btn = document.getElementById('lambda-btn-confirm-create');
+  const hint = document.getElementById('lambda-function-name-hint');
+
+  btn.disabled = !isValid;
+  hint.className = isValid ? "mt-2 text-[10px] text-emerald-500" : "mt-2 text-[10px] text-red-500";
+
+  document.getElementById('lambda-function-handler').value =
+      isValid && functionName
+          ? functionName + "."
+          : "";
+}
+
+async function lambdaPerformCreateFunction() {
+  const functionName = document.getElementById('lambda-function-name').value;
+  const functionRuntime = document.getElementById('lambda-runtime-selector').value;
+  const functionHandler = document.getElementById('lambda-function-handler').value;
+  const functionCode = document.getElementById('lambda-code-upload');
+  const functionCodeStatus = document.getElementById('lambda-function-code-hint');
+
+  if (functionCode.files.length === 0) {
+    functionCodeStatus.className = "mt-2 text-[10px] text-red-500";
+    functionCodeStatus.innerText = "Please select a file first.";
+    return;
+  }
+  functionCodeStatus.innerText = "";
+  functionCodeStatus.className = "mt-2 text-[10px] text-neutral-500 italic";
+
+  const codeFile = functionCode.files[0];
+  const reader = new FileReader();
+
+  reader.onload = async (event) => {
+    const arrayBuffer = event.target.result;
+    try {
+      functionCodeStatus.innerText = "Processing...";
+      const res = await fetch('/dashboard/api/lambda/create-function', {
+        method: 'POST',
+        body: {
+          FunctionName: functionName,
+          Runtime: functionRuntime,
+          Role: "arn:aws:iam::123456789012:role/service-role/lambda-role",
+          Handler: functionHandler,
+          Code: arrayBuffer
+        }
+      });
+
+      if (!res.ok) {
+        functionCodeStatus.innerText = "Code upload failed." + res.statusText;
+      } else {
+        functionCodeStatus.innerText = "Lambda function created successfully!";
+
+        await lambdaLoadFunctions()
+
+        lambdaCloseCreateFunctionModal();
+      }
+    } catch (error) {
+      functionCodeStatus.innerText = "Error: " + error.message;
+    }
+  };
+
+  reader.readAsArrayBuffer(codeFile);
+}
+
 // Cloudwatch
 let cwCurrentLogGroup = "";
 let cwCurrentLogStream = "";
@@ -1221,35 +1371,44 @@ async function showView(viewId) {
   document.querySelectorAll('.view-container').forEach(
       el => el.classList.add('hidden'));
   // Show selected view
-  if (viewId !== 'dynamodb') {
+  const autoRefreshEnabled = document.getElementById('ddb-auto-refresh-check').checked
+  if (viewId !== 'dynamodb' || !autoRefreshEnabled) {
     document.getElementById('ddb-auto-refresh-check').checked = false;
     clearInterval(ddbRefreshInterval);
   }
 
   document.getElementById(`view-${viewId}`).classList.remove('hidden');
 
-  switch (viewId) {
-    case "overview":
-      await fetchOverviewData();
-      return
-    case 'dynamodb':
-      await ddbLoadTables();
-      return;
-    case 'secrets':
-      await loadSecrets();
-      return;
-    case 'kms':
-      await loadKmsKeys();
-      return;
-    case 'sqs':
-      await sqsLoadQueues();
-      return;
-    case 's3':
-      await s3LoadBuckets();
-      return;
-    case 'cloudwatch':
-      await cwLoadLogGroups()
-      return;
+  try {
+    switch (viewId) {
+      case "overview":
+        await fetchOverviewData();
+        return
+      case 'dynamodb':
+        await ddbLoadTables();
+        return;
+      case 'secrets':
+        await loadSecrets();
+        return;
+      case 'kms':
+        await loadKmsKeys();
+        return;
+      case 'sqs':
+        await sqsLoadQueues();
+        return;
+      case 's3':
+        await s3LoadBuckets();
+        return;
+      case 'lambda':
+        await lambdaLoadFunctions();
+        return;
+      case 'cloudwatch':
+        await cwLoadLogGroups()
+        return;
+    }
+  } catch (e) {
+    console.error("Failed to load " + viewId)
+    console.error(e);
   }
 }
 

@@ -105,6 +105,15 @@
         S3
       </button>
 
+      <button id="menu-item-lambda" onclick="showView('lambda')"
+              class="nav-link w-full flex items-center gap-3 p-2 rounded-lg text-sm font-medium transition-all hover:bg-neutral-800  text-slate-300 hidden">
+        <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M8 19l4-8M12 11l4 8m-4-8L9 5" />
+        </svg>
+        Lambda
+      </button>
+
       <div class="mb-4"></div>
 
       <h2 class="text-xs tracking-widest text-gray-300 font-bold mb-4">Service Status</h2>
@@ -625,6 +634,43 @@
       </div>
     </div>
 
+    <!-- Lambda Manager -->
+    <div id="view-lambda" class="view-container hidden h-full flex overflow-hidden bg-neutral-950">
+      <div class="w-64 border-r border-neutral-800 flex flex-col bg-neutral-950">
+        <div class="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/40">
+          <h3 class="text-[10px] font-black text-gray-300 tracking-widest">Lambda Functions</h3>
+          <button onclick="lambdaOpenCreateFunctionModal()" class="text-orange-500 hover:text-orange-400 text-xs font-bold">+
+            Create
+          </button>
+        </div>
+        <div id="lambda-function-list" class="flex-1 overflow-y-auto p-2 space-y-1">
+        </div>
+      </div>
+
+      <div id="lambda-workspace" class="flex-1 flex flex-col hidden bg-neutral-900/10">
+        <div class="p-6 border-b border-neutral-800 flex justify-between items-center">
+          <div>
+            <h2 id="lambda-active-function-name" class="text-md font-bold text-white">function_name</h2>
+<!--            <p id="lambda-active-function-arn" class="text-[12px] text-gray-400 font-bold tracking-tighter">Lambda ARN</p>-->
+          </div>
+          <div class="flex gap-2">
+            <button onclick="lambdaDeleteFunction()"
+                    class="px-4 py-1.5 border border-red-900/50 text-red-700 text-xs font-bold rounded hover:bg-red-950/40 transition-all">
+              Delete Function
+            </button>
+<!--            <button onclick="lambdaOpenCodeUploadModal()"-->
+<!--                    class="px-4 py-1.5 bg-orange-600 text-white text-xs font-bold rounded hover:bg-orange-500 transition-all">-->
+<!--              Upload Code-->
+<!--            </button>-->
+          </div>
+        </div>
+
+        <div id="lambda-active-function-panel" class="view-container hidden border-b border-neutral-800 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-10">
+        </div>
+      </div>
+
+    </div>
+
     <!-- cloudwatch -->
     <div id="view-cloudwatch" class="view-container hidden h-full flex overflow-hidden bg-neutral-950">
       <div class="w-64 border-r border-neutral-800 flex flex-col">
@@ -778,6 +824,68 @@
           </button>
           <button id="sqs-btn-create-queue" onclick="sqsPerformCreateQueue()"
                   class="px-6 py-2 bg-orange-600 text-white rounded-lg text-xs font-bold transition-all">
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lambda create modal -->
+    <div id="lambda-create-modal"
+         class="fixed inset-0 z-[70] hidden flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div class="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-xl shadow-2xl">
+        <div class="p-4 border-b border-neutral-800 flex justify-between items-center">
+          <h3 class="text-md font-bold text-white">Create Lambda</h3>
+          <button onclick="lambdaCloseCreateFunctionModal()" class="text-gray-300 hover:text-white">✕</button>
+        </div>
+
+        <div class="p-4 space-y-4">
+          <div>
+            <label for="lambda-function-name" class="block text-[10px] font-black text-gray-300 mb-2">Function Name (same as file/module name)</label>
+            <input id="lambda-function-name" type="text" placeholder="fileName or module name without extension"
+                   oninput="onLambdaFunctionNameInput(this)"
+                   class="w-full bg-black/50 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-white outline-none focus:border-orange-500 transition-all">
+            <p id="lambda-function-name-hint" class="mt-2 text-[10px] text-neutral-500 italic">
+              Names must start with a letter. Contains letters, numbers, underscore or hyphens only.
+            </p>
+          </div>
+
+          <div>
+            <label for="lambda-runtime-selector" class="block text-[10px] font-black text-gray-300 mb-2">Runtime</label>
+            <select id="lambda-runtime-selector"
+                    class="bg-neutral-800 text-xs border border-neutral-700 rounded px-2 py-1 outline-none">
+              <option value="">--Choose a runtime--</option>
+              <option value="python">python/python3.14</option>
+              <option value="nodejs">nodejs/nodejs25.x</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="lambda-function-handler" class="block text-[10px] font-black text-gray-300 mb-2">Function Handler</label>
+            <input id="lambda-function-handler" type="text" placeholder="functionName.lambdaHandler"
+                   class="w-full bg-black/50 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-white outline-none focus:border-orange-500 transition-all">
+          </div>
+
+          <div>
+            <label for="lambda-code-upload" class="block text-[10px] font-black text-gray-300 mb-2">Lambda Function Code (ZIP)</label>
+
+            <input id="lambda-code-upload"
+                   type="file"
+                   accept=".zip"
+                   class="w-full h-48 bg-black/50 border border-neutral-800 rounded-xl p-4 text-xs font-mono text-blue-200 outline-none focus:border-orange-500 transition-all"
+                   placeholder="functionName.zip" />
+            <p id="lambda-function-code-hint" class="mt-2 text-[10px] text-neutral-500 italic">
+            </p>
+          </div>
+        </div>
+
+        <div class="p-4 border-t border-neutral-800 flex justify-end gap-3 bg-neutral-950/50">
+          <button onclick="lambdaCloseCreateFunctionModal()" class="px-4 py-2 text-xs font-bold text-gray-400 hover:text-white">
+            Cancel
+          </button>
+          <button id="lambda-btn-confirm-create"
+                  onclick="lambdaPerformCreateFunction()"
+                  class="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-bold transition-all">
             Create
           </button>
         </div>

@@ -36,6 +36,7 @@ func NewLambdaService() utils.ServiceHandler {
 }
 
 func (svc *lambdaServiceImplementation) Handle(w http.ResponseWriter, r *http.Request, target string) {
+	svc.cw.Debug(SERVICE, "Handle", fmt.Sprintf("Target: %s, url: %s", target, r.URL.Path))
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		svc.cw.Error(SERVICE, "Dispatcher", fmt.Sprintf("Error reading request payload: %s", err.Error()))
@@ -49,10 +50,12 @@ func (svc *lambdaServiceImplementation) Handle(w http.ResponseWriter, r *http.Re
 	if strings.Contains(target, "ListLambda") {
 		functions := svc.lambda.listFunctions()
 		w.WriteHeader(http.StatusOK)
-		utils.RespondJSON(w, functions)
+		utils.RespondJSON(w, map[string]any{"Functions": functions})
 		return
 	} else if strings.Contains(target, "DescribeLambda") {
-		var req struct{ FunctionName string }
+		var req struct {
+			FunctionName string `json:"FunctionName"`
+		}
 		utils.UnmarshalJson(body, &req)
 
 		function, err := svc.lambda.describeFunction(req.FunctionName)
@@ -65,7 +68,43 @@ func (svc *lambdaServiceImplementation) Handle(w http.ResponseWriter, r *http.Re
 			})
 			return
 		}
+		w.WriteHeader(http.StatusOK)
 		utils.RespondJSON(w, function)
+		return
+	} else if strings.Contains(target, "DeleteLambda") {
+		var req struct {
+			FunctionName string `json:"FunctionName"`
+		}
+		utils.UnmarshalJson(body, &req)
+
+		err := svc.lambda.deleteFunction(req.FunctionName)
+		if err != nil {
+			utils.RespondError(utils.RespInput{
+				Writer:   w,
+				Code:     http.StatusNotFound,
+				ErrorStr: "ResourceNotFoundException",
+				Data:     map[string]string{"message": err.Error()},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	} else if strings.Contains(target, "CreateLambdaFunction") {
+		function, err := svc.lambda.createFunction(body)
+		if err != nil {
+			utils.RespondError(utils.RespInput{
+				Writer:   w,
+				Code:     http.StatusNotFound,
+				ErrorStr: "ResourceNotFoundException",
+				Data:     map[string]string{"message": err.Error()},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		utils.RespondJSON(w, map[string]any{
+			"Function": function,
+		})
+		return
 	}
 
 	if strings.Contains(userAgent, "lambda.create-function") {
@@ -126,6 +165,7 @@ type internalLambda interface {
 	listFunctions() []*FunctionConfig
 	describeFunction(functionName string) (*FunctionConfig, error)
 	createFunction(body []byte) (*FunctionConfig, error)
+	deleteFunction(functionName string) error
 	invokeLocal(req InvokeRequest) (string, error)
 }
 
@@ -199,23 +239,52 @@ func (s *lambdaSvcImplementation) describeFunction(functionName string) (*Functi
 	return val, nil
 }
 
+func (s *lambdaSvcImplementation) deleteFunction(functionName string) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	functionConfig, ok := s.functions[functionName]
+	if !ok {
+		return errors.New("ResourceNotFoundException")
+	}
+
+	functionDir := filepath.Join(utils.LambdaDir, functionConfig.FunctionName)
+	s.cw.Info(SERVICE, "DeleteFunction", fmt.Sprintf("Deleting Lambda function: %s", utils.MarshalIjson(functionConfig)))
+
+	delete(s.functions, functionName)
+
+	return os.RemoveAll(functionDir)
+
+}
+
 func (s *lambdaSvcImplementation) createFunction(body []byte) (*FunctionConfig, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	var req struct {
-		FunctionName string            `json:"FunctionName"`
-		Runtime      string            `json:"Runtime"`
-		Role         string            `json:"Role"`
-		Handler      string            `json:"Handler"`
-		Code         map[string]string `json:"Code"`
+		FunctionName string `json:"FunctionName"`
+		Runtime      string `json:"Runtime"`
+		Role         string `json:"Role"`
+		Handler      string `json:"Handler"`
+		Code         any    `json:"Code"`
 	}
 	utils.UnmarshalJson(body, &req)
 
-	code, err := base64.StdEncoding.DecodeString(req.Code["ZipFile"])
-	if err != nil {
-		return nil, err
+	var code []byte
+
+	switch v := req.Code.(type) {
+	case []byte:
+		code = v
+	case map[string]any:
+		if zipBase64, ok := v["ZipFile"].(string); ok {
+			zipBytes, err := base64.StdEncoding.DecodeString(zipBase64)
+			if err != nil {
+				return nil, err
+			}
+			code = zipBytes
+		}
 	}
+
 	funcPath := filepath.Join(utils.LambdaDir, req.FunctionName)
 	xtractErr := s.extractZip(code, funcPath)
 	if xtractErr != nil {

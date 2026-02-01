@@ -19,25 +19,20 @@ func (d *Dispatcher) HandleLambdasAdmin(w http.ResponseWriter, r *http.Request) 
 	case "/dashboard/api/lambda/describe":
 		name := r.URL.Query().Get("name")
 		action = "DescribeLambda"
-		payload = []byte(fmt.Sprintf(`{"functionName": "%s"}`, name))
-		//case "/dashboard/api/lambda/create":
-		//	action = "CreateSecret"
-		//	body, _ := io.ReadAll(r.Body)
-		//	payload = body
-		//case "/dashboard/api/lambda/put":
-		//	action = "PutSecretValue"
-		//	body, _ := io.ReadAll(r.Body)
-		//	payload = body
-		//case "/dashboard/api/lambda/delete":
-		//	name := r.URL.Query().Get("name")
-		//	action = "DeleteSecret"
-		//	// RecoveryWindowInDays: 0 forces immediate deletion in LocalStack/CloudLocal
-		//	payload = []byte(fmt.Sprintf(`{"SecretId": "%s", "ForceDeleteWithoutRecovery": true}`, name))
+		payload = []byte(fmt.Sprintf(`{"FunctionName": "%s"}`, name))
+	case "/dashboard/api/lambda/create-function":
+		action = "CreateLambdaFunction"
+		body, _ := io.ReadAll(r.Body)
+		payload = body
+	case "/dashboard/api/lambda/delete":
+		name := r.URL.Query().Get("name")
+		action = "DeleteLambda"
+		payload = []byte(fmt.Sprintf(`{"FunctionName": "%s"}`, name))
 	}
 
 	if action != "" {
 		// Use your existing ProxyToDynamo but change the Target Header prefix
-		d.ProxyToSecrets(w, action, payload)
+		d.ProxyToLambdas(w, action, payload)
 	}
 }
 

@@ -111,6 +111,13 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if d.LambdaSvc != nil &&
+		(strings.HasPrefix(r.URL.Path, "/2015-03-31/functions") ||
+			strings.HasPrefix(amzTarget, "lambda")) {
+		d.LambdaSvc.Handle(w, r, amzTarget)
+		return
+	}
+
 	if d.SnsSvc != nil && isSnsAction(action) {
 
 		d.SnsSvc.Handle(w, bodyValues)
@@ -120,15 +127,6 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if d.S3Svc != nil && isS3Request(r) {
 
 		d.S3Svc.Handle(w, r, amzTarget)
-		return
-	}
-
-	if d.LambdaSvc != nil &&
-		(strings.HasPrefix(r.URL.Path, "/2015-03-31/functions") ||
-			strings.HasPrefix(amzTarget, "lambda")) {
-
-		d.LambdaSvc.Handle(w, r, amzTarget)
-
 		return
 	}
 
