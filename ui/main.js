@@ -1131,8 +1131,9 @@ async function lambdaLoadFunctions() {
 
   if (data && data.Functions) {
     container.innerHTML = data.Functions.map(f => `
-        <div class="flex items-center group px-2 rounded-lg hover:bg-neutral-800 transition-all cls-s3-bucket-parent">
-            <button onclick="lambdaSelectFunction(this, '${f}')" class="cls-btn-lambda-func flex-1 text-left py-3 text-sm flex items-center gap-2 overflow-hidden">
+        <div class="flex items-center group px-2 rounded-lg hover:bg-neutral-800 transition-all cls-lambda-function-parent">
+            <button onclick="lambdaSelectFunction(this)" data-payload='${JSON.stringify(f)}'
+             class="cls-btn-lambda-func flex-1 text-left py-3 text-sm flex items-center gap-2 overflow-hidden">
                 <svg class="w-6 h-6 text-blue-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
                 <span class="text-slate-300 truncate">${f.FunctionName}</span>
             </button>
@@ -1147,23 +1148,27 @@ async function lambdaLoadFunctions() {
   }
 }
 
-async function lambdaSelectFunction(e, lambdaFunction) {
+async function lambdaSelectFunction(e) {
+  const lambdaFunction = JSON.parse(e.dataset.payload);
   lambdaCurrentFunction = lambdaFunction;
 
-  styleSelectedElement(e,'button.cls-btn-lambda-func');
+  if (e) {
+    styleSelectedElement(e.parentElement, 'div.cls-lambda-function-parent');
+  }
+  const lambdaFunctionGrid = document.getElementById('lambda-active-function-panel');
+  lambdaFunctionGrid.innerHTML = "";
+  lambdaFunctionGrid.classList.add('hidden');
 
   document.getElementById('lambda-workspace').classList.remove('hidden');
   document.getElementById('lambda-active-function-name').innerText = lambdaFunction.FunctionName;
-  // document.getElementById('lambda-active-function-arn').innerText = lambdaFunction.FunctionArn;
 
-  const lambdaFunctionGrid = document.getElementById('lambda-active-function-panel');
   lambdaFunctionGrid.innerHTML = Object.entries(lambdaFunction).map(([k, v]) => `
-                        <div class="bg-stone-900 border border-stone-800 p-4 rounded-2xl hover:border-stone-700 transition-colors">
-                            <div class="text-base font-bold text-gray-400 tracking-tighter">${k}</div>
-                            <div class="text-md font-black text-white mt-2">${v}</div>
+                        <div class="p-2">
+                            <div class="text-xs font-bold text-gray-400 tracking-tighter">${k}</div>
+                            <div class="text-xs text-white mt-2">${k === "LastModified" ? toISOString(v) : v}</div>
                         </div>
                     `).join('');
-
+  lambdaFunctionGrid.classList.remove('hidden');
 }
 
 async function lambdaDeleteFunction(functionName) {
@@ -1241,18 +1246,21 @@ async function lambdaPerformCreateFunction() {
   const reader = new FileReader();
 
   reader.onload = async (event) => {
-    const arrayBuffer = event.target.result;
+    const base64String = event.target.result.split(',')[1];
+    // const arrayBuffer = event.target.result;
     try {
       functionCodeStatus.innerText = "Processing...";
       const res = await fetch('/dashboard/api/lambda/create-function', {
         method: 'POST',
-        body: {
+        body: JSON.stringify({
           FunctionName: functionName,
           Runtime: functionRuntime,
           Role: "arn:aws:iam::123456789012:role/service-role/lambda-role",
           Handler: functionHandler,
-          Code: arrayBuffer
-        }
+          Code: {
+            ZipFile: base64String
+          }
+        })
       });
 
       if (!res.ok) {
@@ -1269,7 +1277,7 @@ async function lambdaPerformCreateFunction() {
     }
   };
 
-  reader.readAsArrayBuffer(codeFile);
+  reader.readAsDataURL(codeFile);
 }
 
 // Cloudwatch
@@ -1340,7 +1348,7 @@ async function cwRefreshLogs() {
   const data = await res.json();
 
   container.innerHTML = data.events.map(e => {
-    const date = new Date(e.timestamp).toISOString();
+    const date = toISOString(e.timestamp);
     let level = e.level;
 
     level = level.replace(/DEBUG/g, '<span class="text-cyan-400 font-bold">DEBUG</span>');
@@ -1453,7 +1461,7 @@ async function fetchOverviewData() {
         storageGrid.innerHTML = Object.entries(data.storage).map(([svc, size]) => `
                         <div class="bg-stone-900 border border-stone-800 p-4 rounded-2xl hover:border-stone-700 transition-colors">
                             <div class="text-xs font-bold text-gray-400 tracking-tighter">${svc}</div>
-                            <div class="text-2xl font-black text-white mt-2">${size}</div>
+                            <div class="text-2xl text-white mt-2">${size}</div>
                         </div>
                     `).join('');
     */
@@ -1549,6 +1557,10 @@ function styleSelectedElement(e, selector) {
   document.querySelectorAll(selector)
   .forEach(b => b.classList.remove('bg-neutral-800', 'border-neutral-700', 'text-white'));
   e.classList.add('bg-neutral-800', 'border-neutral-700', 'text-white');
+}
+
+function toISOString(epoch) {
+  return new Date(epoch).toISOString();
 }
 
 // Initialize with Edge logs

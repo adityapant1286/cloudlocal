@@ -262,27 +262,26 @@ func (s *lambdaSvcImplementation) createFunction(body []byte) (*FunctionConfig, 
 	defer s.mu.Unlock()
 
 	var req struct {
-		FunctionName string `json:"FunctionName"`
-		Runtime      string `json:"Runtime"`
-		Role         string `json:"Role"`
-		Handler      string `json:"Handler"`
-		Code         any    `json:"Code"`
+		FunctionName string            `json:"FunctionName"`
+		Runtime      string            `json:"Runtime"`
+		Role         string            `json:"Role"`
+		Handler      string            `json:"Handler"`
+		Code         map[string]string `json:"Code"`
 	}
 	utils.UnmarshalJson(body, &req)
 
 	var code []byte
 
-	switch v := req.Code.(type) {
-	case []byte:
-		code = v
-	case map[string]any:
-		if zipBase64, ok := v["ZipFile"].(string); ok {
-			zipBytes, err := base64.StdEncoding.DecodeString(zipBase64)
-			if err != nil {
-				return nil, err
-			}
-			code = zipBytes
+	if zipBase64, ok := req.Code["ZipFile"]; ok {
+		zipBytes, err := base64.StdEncoding.DecodeString(zipBase64)
+		if err != nil {
+			return nil, err
 		}
+		code = zipBytes
+	}
+
+	if code == nil {
+		return nil, errors.New("invalid file contents")
 	}
 
 	funcPath := filepath.Join(utils.LambdaDir, req.FunctionName)
@@ -300,7 +299,7 @@ func (s *lambdaSvcImplementation) createFunction(body []byte) (*FunctionConfig, 
 		Handler:      req.Handler,
 		RevisionId:   uuid,
 		FunctionArn:  arn,
-		LastModified: time.Now().Unix(),
+		LastModified: time.Now().Unix() * 1000,
 	}
 
 	s.functions[req.FunctionName] = newFunctionCfg
@@ -442,8 +441,8 @@ func (s *lambdaSvcImplementation) extractZip(zipData []byte, destFolder string) 
 		_, err = io.Copy(outFile, rc)
 
 		// Close both immediately to avoid resource leaks in large loops
-		rc.Close()
-		outFile.Close()
+		defer rc.Close()
+		defer outFile.Close()
 
 		if err != nil {
 			return err

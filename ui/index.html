@@ -38,7 +38,7 @@
     </div>
 
     <nav class="flex-1">
-      <h2 class="text-xs tracking-widest text-gray-300 font-bold mb-4">Menu</h2>
+      <h2 class="text-sm tracking-widest text-gray-300 font-bold mb-3">Menu</h2>
 
       <button onclick="showView('overview')"
               class="nav-link w-full flex items-center gap-3 p-2 rounded-lg text-sm font-medium transition-all hover:bg-neutral-800 text-slate-300">
@@ -209,7 +209,7 @@
     <!-- DynamoDb Explorer -->
     <div id="view-dynamodb" class="view-container hidden h-full flex flex-row overflow-hidden">
       <div class="w-[20%] bg-neutral-950 border-r border-neutral-800 py-6 px-1 overflow-y-auto">
-        <h3 class="text-xs font-black text-gray-300 tracking-widest px-6 mb-6">Dynamo Tables</h3>
+        <h3 class="text-xs text-gray-300 tracking-widest px-6 mb-6">Dynamo Tables</h3>
         <div id="ddb-table-list" class="space-y-2"></div>
       </div>
 
@@ -225,7 +225,7 @@
             </div>
             <div>
               <h2 id="active-table-title" class="text-xl font-bold text-white leading-tight">Select a table</h2>
-              <p class="text-[10px] text-gray-300 tracking-widest font-bold mt-0.5">DynamoDB Table</p>
+              <p class="text-[11px] text-gray-300 tracking-widest font-bold mt-0.5">DynamoDB Table</p>
             </div>
           </div>
 
@@ -295,7 +295,7 @@
           <!-- DynamoDb Refresh -->
           <div class="flex items-center gap-2">
             <label class="flex items-center gap-2 cursor-pointer group mr-2">
-              <span class="text-[10px] font-bold text-gray-300 tracking-tighter group-hover:text-gray-300">Live</span>
+              <span class="text-[11px] font-bold text-gray-300 tracking-tighter group-hover:text-gray-300">Live</span>
               <input type="checkbox" id="ddb-auto-refresh-check" onchange="toggleDdbAutoRefresh()" class="sr-only peer">
               <div
                   class="w-8 h-4 bg-neutral-800 rounded-full peer peer-checked:bg-orange-600 relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
@@ -341,7 +341,7 @@
     <div id="view-secrets" class="view-container hidden h-full flex overflow-hidden bg-neutral-950">
       <div class="w-72 border-r border-neutral-800 flex flex-col">
         <div class="p-4 border-b border-neutral-800 flex justify-between items-center">
-          <h3 class="text-xs font-black text-gray-300 tracking-widest">Secrets</h3>
+          <h3 class="text-xs text-gray-300 tracking-widest">Secrets</h3>
           <button onclick="openSecretModal('create')" class="text-orange-500 hover:text-orange-400 text-xs font-bold">+
             New
           </button>
@@ -354,7 +354,7 @@
         <div class="p-6 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/20">
           <div>
             <h2 id="sm-active-secret-name" class="text-xl font-bold text-white">secret_name</h2>
-            <p id="sm-active-secret-arn" class="text-[10px] text-gray-300 font-mono"></p>
+            <p id="sm-active-secret-arn" class="text-[11px] text-gray-300 font-mono"></p>
           </div>
           <div class="flex gap-3">
             <button onclick="deleteSecret()"
@@ -389,14 +389,14 @@
           <div class="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50">
             <div>
               <h3 id="sm-secret-modal-title" class="text-md font-bold text-white">Create New Secret</h3>
-              <p class="text-[10px] text-gray-300 tracking-widest mt-1">Secrets Manager</p>
+              <p class="text-[11px] text-gray-300 tracking-widest mt-1">Secrets Manager</p>
             </div>
             <button onclick="closeSecretModal()" class="text-gray-300 hover:text-white transition-colors">✕</button>
           </div>
 
           <div class="p-4 space-y-4">
             <div id="sm-secret-name-group">
-              <label class="block text-[10px] font-black text-gray-300 mb-2">Secret Name</label>
+              <label class="block text-[11px] text-gray-300 mb-2">Secret Name</label>
               <label for="sm-modal-secret-name"></label>
               <input id="sm-modal-secret-name" type="text" placeholder="e.g. /prod/api/key"
                      class="w-full bg-black/50 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-white outline-none focus:border-orange-500 transition-all">
@@ -404,8 +404,8 @@
 
             <div>
               <div class="flex justify-between items-end mb-2">
-                <label class="text-[10px] font-black text-gray-300">Secret Value (Text or JSON)</label>
-                <button onclick="formatSecretJson()" class="text-[10px] text-orange-500 hover:underline">Pretty Print
+                <label class="text-[11px] text-gray-300">Secret Value (Text or JSON)</label>
+                <button onclick="formatSecretJson()" class="text-[11px] text-orange-500 hover:underline">Pretty Print
                   JSON
                 </button>
               </div>
@@ -436,7 +436,7 @@
     <div id="view-kms" class="view-container hidden h-full flex overflow-hidden">
       <div class="w-72 border-r border-neutral-800 flex flex-col bg-neutral-950">
         <div class="p-4 border-b border-neutral-800 flex justify-between items-center">
-          <h3 class="text-xs font-black text-gray-300 tracking-widest">KMS Keys</h3>
+          <h3 class="text-xs text-gray-300 tracking-widest">KMS Keys</h3>
           <button onclick="createKmsKey()" class="text-orange-500 hover:text-orange-400 text-xs font-bold">+ Create</button>
         </div>
         <div id="kms-key-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
@@ -446,7 +446,7 @@
         <div class="p-6 border-b border-neutral-800 flex justify-between items-center">
           <div>
             <h2 id="kms-active-key-id" class="text-md font-mono text-white">key-id</h2>
-            <p id="kms-active-key-arn" class="text-[10px] text-gray-300 font-bold tracking-tighter"></p>
+            <p id="kms-active-key-arn" class="text-[11px] text-gray-300 font-bold tracking-tighter"></p>
           </div>
           <div>
             <button onclick="openKmsCreateAliasModel()" class="text-orange-500 hover:text-orange-400 text-xs font-bold">
@@ -479,7 +479,7 @@
 
             <div class="bg-neutral-800/30 p-3 rounded border border-neutral-800 min-h-32 relative group">
               <p class="text-xs text-gray-200 mb-1">Ciphertext (Base64)</p>
-              <code id="kms-encrypt-output" class="text-[10px] text-orange-200 break-all pr-8 block"></code>
+              <code id="kms-encrypt-output" class="text-[11px] text-orange-200 break-all pr-8 block"></code>
 
               <button onclick="copyKmsResult('kms-encrypt-output')"
                       class="absolute top-2 right-2 p-1.5 text-gray-300 hover:text-white bg-neutral-800/50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
@@ -510,7 +510,7 @@
 
             <div class="bg-neutral-800/30 p-3 rounded border border-neutral-800 min-h-32 relative group">
               <p class="text-xs text-gray-200 mb-1">Plaintext Result</p>
-              <code id="kms-decrypt-output" class="text-[10px] text-emerald-400 break-all pr-8 block"></code>
+              <code id="kms-decrypt-output" class="text-[11px] text-emerald-400 break-all pr-8 block"></code>
 
               <button onclick="copyKmsResult('kms-decrypt-output')"
                       class="absolute top-2 right-2 p-1.5 text-gray-300 hover:text-white bg-neutral-800/50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
@@ -530,7 +530,7 @@
     <div id="view-sqs" class="view-container hidden h-full flex overflow-hidden">
       <div class="w-80 border-r border-neutral-800 flex flex-col bg-neutral-950">
         <div class="p-4 border-b border-neutral-800 flex justify-between items-center">
-          <h3 class="text-xs font-black text-gray-300 tracking-widest">SQS Queues</h3>
+          <h3 class="text-xs text-gray-300 tracking-widest">SQS Queues</h3>
           <div class="flex items-center justify-between gap-2">
             <button onclick="sqsLoadQueues()" class="p-1 hover:bg-neutral-800 rounded">
               <svg class="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -551,7 +551,7 @@
         <div class="p-6 border-b border-neutral-800 flex justify-between items-center">
           <div>
             <h2 id="sqs-active-queue-name" class="text-md font-bold text-white">Queue Name</h2>
-            <p id="sqs-active-queue-url" class="text-[10px] text-gray-300 font-mono"></p>
+            <p id="sqs-active-queue-url" class="text-[11px] text-gray-300 font-mono"></p>
           </div>
           <button onclick="sqsPurgeQueue()"
                   class="text-xs font-bold text-red-500 border border-red-900/50 px-3 py-1 rounded hover:bg-red-950">
@@ -562,7 +562,7 @@
         <div class="flex-1 overflow-hidden flex">
           <div class="flex-1 border-r border-neutral-800 flex flex-col">
             <div class="p-4 bg-black/20 flex justify-between items-center">
-              <span class="text-[10px] font-bold text-gray-400">Available Messages</span>
+              <span class="text-[11px] font-bold text-gray-400">Available Messages</span>
               <button onclick="sqsReceiveMessages()"
                       class="bg-orange-600 hover:bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded">Poll
                 Messages
@@ -591,7 +591,7 @@
     <div id="view-s3" class="view-container hidden h-full flex overflow-hidden bg-neutral-950">
       <div class="w-64 border-r border-neutral-800 flex flex-col bg-neutral-950">
         <div class="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/40">
-          <h3 class="text-[10px] font-black text-gray-300 tracking-widest">S3 Buckets</h3>
+          <h3 class="text-[11px] text-gray-300 tracking-widest">S3 Buckets</h3>
           <button onclick="s3OpenCreateBucketModal()" class="text-orange-500 hover:text-orange-400 text-xs font-bold">+
             Create
           </button>
@@ -638,7 +638,7 @@
     <div id="view-lambda" class="view-container hidden h-full flex overflow-hidden bg-neutral-950">
       <div class="w-64 border-r border-neutral-800 flex flex-col bg-neutral-950">
         <div class="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/40">
-          <h3 class="text-[10px] font-black text-gray-300 tracking-widest">Lambda Functions</h3>
+          <h3 class="text-[11px] text-gray-300 tracking-widest">Lambda Functions</h3>
           <button onclick="lambdaOpenCreateFunctionModal()" class="text-orange-500 hover:text-orange-400 text-xs font-bold">+
             Create
           </button>
@@ -665,7 +665,7 @@
           </div>
         </div>
 
-        <div id="lambda-active-function-panel" class="view-container hidden border-b border-neutral-800 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-10">
+        <div id="lambda-active-function-panel" class="view-container hidden border-b p-4 border-neutral-800 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-2">
         </div>
       </div>
 
@@ -675,14 +675,14 @@
     <div id="view-cloudwatch" class="view-container hidden h-full flex overflow-hidden bg-neutral-950">
       <div class="w-64 border-r border-neutral-800 flex flex-col">
         <div class="p-4 border-b border-neutral-800 bg-neutral-900/40">
-          <h3 class="text-xs font-black text-gray-300 tracking-widest">Log Groups</h3>
+          <h3 class="text-xs text-gray-300 tracking-widest">Log Groups</h3>
         </div>
         <div id="cw-group-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
       </div>
 
       <div id="cw-streams-panel" class="w-64 border-r border-neutral-800 flex flex-col hidden bg-neutral-900/20">
         <div class="p-4 border-b border-neutral-800">
-          <h3 class="text-xs font-black text-gray-300 tracking-widest">Log Streams</h3>
+          <h3 class="text-xs text-gray-300 tracking-widest">Log Streams</h3>
         </div>
         <div id="cw-stream-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
       </div>
@@ -719,14 +719,14 @@
 
         <div class="p-4 space-y-4">
           <div>
-            <label for="s3-upload-key" class="block text-[10px] font-black text-gray-300 mb-2">Object Key
+            <label for="s3-upload-key" class="block text-[11px] text-gray-300 mb-2">Object Key
               (Path/File Name)</label>
             <input id="s3-upload-key" type="text" placeholder="images/logo.png or config.json"
                    class="w-full bg-black/50 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-white outline-none focus:border-orange-500 transition-all">
           </div>
 
           <div>
-            <label for="s3-upload-content" class="block text-[10px] font-black text-gray-300 mb-2">File
+            <label for="s3-upload-content" class="block text-[11px] text-gray-300 mb-2">File
               Content (Text/Base64)</label>
             <textarea id="s3-upload-content"
                       class="w-full h-48 bg-black/50 border border-neutral-800 rounded-xl p-4 text-xs font-mono text-blue-200 outline-none focus:border-orange-500 transition-all"
@@ -754,7 +754,7 @@
           <h3 class="text-md font-bold text-white">Create S3 Bucket</h3>
         </div>
         <div class="p-4">
-          <label for="s3-new-bucket-name" class="block text-[10px] font-black text-gray-300 mb-2">Bucket Name</label>
+          <label for="s3-new-bucket-name" class="block text-[11px] text-gray-300 mb-2">Bucket Name</label>
           <input id="s3-new-bucket-name" type="text"
                  oninput="s3ValidateBucketName(this.value)"
                  placeholder="my-local-bucket"
@@ -784,7 +784,7 @@
           <div id="kms-create-alias-key-id" class="mt-2 text-sm text-gray-300"></div>
         </div>
         <div class="p-4">
-          <label for="kms-new-alias-name" class="block text-[10px] font-black text-gray-300 mb-2">Alias Name</label>
+          <label for="kms-new-alias-name" class="block text-[11px] text-gray-300 mb-2">Alias Name</label>
           <input id="kms-new-alias-name" type="text"
                  placeholder="alias/local-kms"
                  class="w-full bg-black/50 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-white outline-none focus:border-orange-500 transition-all">
@@ -810,7 +810,7 @@
           <h3 class="text-md font-bold text-white">Create SQS Queue</h3>
         </div>
         <div class="p-4">
-          <label for="sqs-new-queue-name" class="block text-[10px] font-black text-gray-300 mb-2">Queue Name</label>
+          <label for="sqs-new-queue-name" class="block text-[11px] text-gray-300 mb-2">Queue Name</label>
           <input id="sqs-new-queue-name" type="text"
                  placeholder="my-local-queue"
                  class="w-full bg-black/50 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-white outline-none focus:border-orange-500 transition-all">
@@ -841,19 +841,19 @@
 
         <div class="p-4 space-y-4">
           <div>
-            <label for="lambda-function-name" class="block text-[10px] font-black text-gray-300 mb-2">Function Name (same as file/module name)</label>
+            <label for="lambda-function-name" class="block text-[11px] text-gray-300 mb-2">Function Name (same as file/module name)</label>
             <input id="lambda-function-name" type="text" placeholder="fileName or module name without extension"
                    oninput="onLambdaFunctionNameInput(this)"
-                   class="w-full bg-black/50 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-white outline-none focus:border-orange-500 transition-all">
-            <p id="lambda-function-name-hint" class="mt-2 text-[10px] text-neutral-500 italic">
+                   class="w-full bg-black/50 border border-neutral-800 rounded-lg px-4 py-2 text-sm font-mono text-white outline-none focus:border-orange-500 transition-all">
+            <p id="lambda-function-name-hint" class="mt-2 text-[10px] text-neutral-400 italic">
               Names must start with a letter. Contains letters, numbers, underscore or hyphens only.
             </p>
           </div>
 
           <div>
-            <label for="lambda-runtime-selector" class="block text-[10px] font-black text-gray-300 mb-2">Runtime</label>
+            <label for="lambda-runtime-selector" class="block text-[11px] text-gray-300 mb-2">Runtime</label>
             <select id="lambda-runtime-selector"
-                    class="bg-neutral-800 text-xs border border-neutral-700 rounded px-2 py-1 outline-none">
+                    class="bg-neutral-800 text-xs font-mono border border-neutral-700 rounded px-2 py-1 outline-none">
               <option value="">--Choose a runtime--</option>
               <option value="python">python/python3.14</option>
               <option value="nodejs">nodejs/nodejs25.x</option>
@@ -861,20 +861,20 @@
           </div>
 
           <div>
-            <label for="lambda-function-handler" class="block text-[10px] font-black text-gray-300 mb-2">Function Handler</label>
+            <label for="lambda-function-handler" class="block text-[11px] text-gray-300 mb-2">Function Handler</label>
             <input id="lambda-function-handler" type="text" placeholder="functionName.lambdaHandler"
-                   class="w-full bg-black/50 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-white outline-none focus:border-orange-500 transition-all">
+                   class="w-full bg-black/50 border border-neutral-800 rounded-lg px-4 py-2 text-sm font-mono text-white outline-none focus:border-orange-500 transition-all">
           </div>
 
           <div>
-            <label for="lambda-code-upload" class="block text-[10px] font-black text-gray-300 mb-2">Lambda Function Code (ZIP)</label>
+            <label for="lambda-code-upload" class="block text-[11px] text-gray-300 mb-2">Lambda Function Code (ZIP)</label>
 
             <input id="lambda-code-upload"
                    type="file"
                    accept=".zip"
-                   class="w-full h-48 bg-black/50 border border-neutral-800 rounded-xl p-4 text-xs font-mono text-blue-200 outline-none focus:border-orange-500 transition-all"
+                   class="w-full bg-black/50 border border-neutral-800 rounded-xl p-3 text-sm font-mono text-blue-200 outline-none focus:border-orange-500 transition-all"
                    placeholder="functionName.zip" />
-            <p id="lambda-function-code-hint" class="mt-2 text-[10px] text-neutral-500 italic">
+            <p id="lambda-function-code-hint" class="mt-2 text-[11px] text-neutral-400 italic">
             </p>
           </div>
         </div>
