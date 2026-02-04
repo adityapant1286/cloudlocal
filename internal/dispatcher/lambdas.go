@@ -20,8 +20,16 @@ func (d *Dispatcher) HandleLambdasAdmin(w http.ResponseWriter, r *http.Request) 
 		name := r.URL.Query().Get("name")
 		action = "DescribeLambda"
 		payload = []byte(fmt.Sprintf(`{"FunctionName": "%s"}`, name))
+	case "/dashboard/api/lambda/retrieve-code":
+		name := r.URL.Query().Get("name")
+		action = "RetrieveLambdaCode"
+		payload = []byte(fmt.Sprintf(`{"FunctionName": "%s"}`, name))
 	case "/dashboard/api/lambda/create-function":
 		action = "CreateLambdaFunction"
+		body, _ := io.ReadAll(r.Body)
+		payload = body
+	case "/dashboard/api/lambda/invoke-function":
+		action = "InvokeLambdaFunction"
 		body, _ := io.ReadAll(r.Body)
 		payload = body
 	case "/dashboard/api/lambda/delete":

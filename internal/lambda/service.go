@@ -22,6 +22,8 @@ import (
 	"time"
 )
 
+var supportedRuntimeFileTypes = map[string]string{"python": ".py", "python3.14": ".py", "nodejs": ".js", "nodejs25.x": ".js"}
+
 func NewLambdaService() utils.ServiceHandler {
 	cw := cloudwatch.GetServiceInstance()
 	var lambdaEnabled = utils.IsServiceEnabled(LAMBDA)
@@ -105,6 +107,31 @@ func (svc *lambdaServiceImplementation) Handle(w http.ResponseWriter, r *http.Re
 			"Function": function,
 		})
 		return
+	} else if strings.Contains(target, "InvokeLambdaFunction") {
+		var req InvokeRequest
+		utils.UnmarshalJson(body, &req)
+
+		svc.lambda.invokeLambda(w, req)
+		return
+	} else if strings.Contains(target, "RetrieveLambdaCode") {
+		var req struct {
+			FunctionName string `json:"FunctionName"`
+		}
+		utils.UnmarshalJson(body, &req)
+
+		code, err := svc.lambda.retrieveCode(req.FunctionName)
+		if err != nil {
+			utils.RespondError(utils.RespInput{
+				Writer:   w,
+				Code:     http.StatusNotFound,
+				ErrorStr: "ResourceNotFoundException",
+				Data:     map[string]string{"message": err.Error()},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		utils.RespondJSON(w, map[string]any{"sourceCode": code})
+		return
 	}
 
 	if strings.Contains(userAgent, "lambda.create-function") {
@@ -131,31 +158,7 @@ func (svc *lambdaServiceImplementation) Handle(w http.ResponseWriter, r *http.Re
 			Payload:      payload,
 		}
 
-		result, err := svc.lambda.invokeLocal(req)
-
-		if err != nil {
-			w.Header().Set("X-Amz-Function-Error", "Unhandled")
-			w.WriteHeader(http.StatusInternalServerError)
-			utils.RespondJSON(w, map[string]string{"message": err.Error()})
-			return
-		}
-
-		// 4. Return the result as raw JSON bytes (as Lambda does)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-
-		var resp []byte
-
-		if result == "" {
-			resp = []byte("{}")
-		} else {
-			resp = []byte(result)
-		}
-		_, werr := w.Write(resp)
-		if werr != nil {
-			svc.cw.Error(SERVICE, functionName, fmt.Sprintf("Response error: %v", werr.Error()))
-			return
-		}
+		svc.lambda.invokeLambda(w, req)
 		return
 	}
 
@@ -167,6 +170,8 @@ type internalLambda interface {
 	createFunction(body []byte) (*FunctionConfig, error)
 	deleteFunction(functionName string) error
 	invokeLocal(req InvokeRequest) (string, error)
+	invokeLambda(w http.ResponseWriter, req InvokeRequest)
+	retrieveCode(functionName string) (string, error)
 }
 
 func newLambdaService(cw cloudwatch.CwService) internalLambda {
@@ -212,6 +217,44 @@ func (s *lambdaSvcImplementation) load() {
 	if err := utils.UnmarshalJsonErrors(data, &state); err == nil {
 		s.functions = state.Functions
 	}
+}
+
+func (s *lambdaSvcImplementation) invokeLambda(w http.ResponseWriter, req InvokeRequest) {
+
+	result, err := s.invokeLocal(req)
+
+	if err != nil {
+		s.cw.Error(SERVICE, req.FunctionName, fmt.Sprintf("Invocation error: %v", err.Error()))
+
+		w.Header().Set("X-Amz-Function-Error", "Unhandled")
+		w.WriteHeader(http.StatusInternalServerError)
+		utils.RespondJSON(w, map[string]string{"message": err.Error()})
+
+		return
+	}
+
+	// 4. Return the result as raw JSON bytes (as Lambda does)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	var resp []byte
+
+	if result == "" {
+		resp = []byte("{}")
+	} else {
+		resp = []byte(result)
+	}
+	_, werr := w.Write(resp)
+	if werr != nil {
+		s.cw.Error(SERVICE, req.FunctionName, fmt.Sprintf("Response error: %v", werr.Error()))
+
+		w.Header().Set("X-Amz-Function-Error", "Unhandled")
+		w.WriteHeader(http.StatusInternalServerError)
+		utils.RespondJSON(w, map[string]string{"message": werr.Error()})
+
+		return
+	}
+	return
 }
 
 func (s *lambdaSvcImplementation) listFunctions() []*FunctionConfig {
@@ -306,6 +349,24 @@ func (s *lambdaSvcImplementation) createFunction(body []byte) (*FunctionConfig, 
 	s.save()
 	s.cw.Info(SERVICE, "CreateFunction", fmt.Sprintf("Created Function config: %s", utils.MarshalIjson(newFunctionCfg)))
 	return newFunctionCfg, nil
+}
+
+func (s *lambdaSvcImplementation) retrieveCode(functionName string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	functionConfig := s.functions[functionName]
+	fileType := supportedRuntimeFileTypes[functionConfig.Runtime]
+	fileName := strings.Split(functionConfig.Handler, ".")[0]
+
+	funcFilePath := filepath.Join(utils.LambdaDir, functionConfig.FunctionName, fileName+fileType)
+
+	content, err := os.ReadFile(funcFilePath)
+	if err != nil {
+		s.cw.Error(SERVICE, functionConfig.FunctionName, fmt.Sprintf("Error retrieving code: %s", err.Error()))
+		return "", err
+	}
+	return string(content), nil
 }
 
 func (s *lambdaSvcImplementation) invokeLocal(req InvokeRequest) (string, error) {
