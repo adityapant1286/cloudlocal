@@ -28,6 +28,10 @@ func (d *Dispatcher) HandleLambdasAdmin(w http.ResponseWriter, r *http.Request) 
 		action = "CreateLambdaFunction"
 		body, _ := io.ReadAll(r.Body)
 		payload = body
+	case "/dashboard/api/lambda/update-function":
+		action = "UpdateLambdaFunction"
+		body, _ := io.ReadAll(r.Body)
+		payload = body
 	case "/dashboard/api/lambda/invoke-function":
 		action = "InvokeLambdaFunction"
 		body, _ := io.ReadAll(r.Body)

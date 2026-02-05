@@ -132,6 +132,22 @@ func (svc *lambdaServiceImplementation) Handle(w http.ResponseWriter, r *http.Re
 		w.WriteHeader(http.StatusOK)
 		utils.RespondJSON(w, map[string]any{"sourceCode": code})
 		return
+	} else if strings.Contains(target, "UpdateLambdaFunction") {
+		function, err := svc.lambda.updateFunction(body)
+		if err != nil {
+			utils.RespondError(utils.RespInput{
+				Writer:   w,
+				Code:     http.StatusNotFound,
+				ErrorStr: "ResourceNotFoundException",
+				Data:     map[string]string{"message": err.Error()},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		utils.RespondJSON(w, map[string]any{
+			"Function": function,
+		})
+		return
 	}
 
 	if strings.Contains(userAgent, "lambda.create-function") {
@@ -168,6 +184,7 @@ type internalLambda interface {
 	listFunctions() []*FunctionConfig
 	describeFunction(functionName string) (*FunctionConfig, error)
 	createFunction(body []byte) (*FunctionConfig, error)
+	updateFunction(body []byte) (*FunctionConfig, error)
 	deleteFunction(functionName string) error
 	invokeLocal(req InvokeRequest) (string, error)
 	invokeLambda(w http.ResponseWriter, req InvokeRequest)
@@ -348,6 +365,76 @@ func (s *lambdaSvcImplementation) createFunction(body []byte) (*FunctionConfig, 
 	s.functions[req.FunctionName] = newFunctionCfg
 	s.save()
 	s.cw.Info(SERVICE, "CreateFunction", fmt.Sprintf("Created Function config: %s", utils.MarshalIjson(newFunctionCfg)))
+	return newFunctionCfg, nil
+}
+
+func (s *lambdaSvcImplementation) updateFunction(body []byte) (*FunctionConfig, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var req struct {
+		FunctionName string            `json:"FunctionName"`
+		Handler      string            `json:"Handler"`
+		Code         map[string]string `json:"Code"`
+	}
+	utils.UnmarshalJson(body, &req)
+
+	functionConfig, ok := s.functions[req.FunctionName]
+	if !ok {
+		return nil, errors.New("ResourceNotFoundException")
+	}
+
+	// delete existing
+	functionDir := filepath.Join(utils.LambdaDir, functionConfig.FunctionName)
+	s.cw.Info(SERVICE, "UpdateFunction", fmt.Sprintf("Deleting Lambda function: %s", utils.MarshalIjson(functionConfig)))
+
+	err := os.RemoveAll(functionDir)
+	if err != nil {
+		s.cw.Info(SERVICE, "UpdateFunction", fmt.Sprintf("Error in deleting Lambda function: %s", err.Error()))
+		return nil, err
+	}
+
+	// create new
+	var code []byte
+
+	if zipBase64, ok := req.Code["ZipFile"]; ok {
+		zipBytes, err := base64.StdEncoding.DecodeString(zipBase64)
+		if err != nil {
+			return nil, err
+		}
+		code = zipBytes
+	}
+
+	if code == nil {
+		return nil, errors.New("invalid file contents")
+	}
+
+	xtractErr := s.extractZip(code, functionDir)
+	if xtractErr != nil {
+		return nil, xtractErr
+	}
+
+	var handler string
+	if len(req.Handler) > 0 {
+		handler = req.Handler
+	} else {
+		handler = functionConfig.Handler
+	}
+
+	uuid := utils.RandomUuid()
+	newFunctionCfg := &FunctionConfig{
+		FunctionName: functionConfig.FunctionName,
+		FunctionArn:  functionConfig.FunctionArn,
+		Runtime:      functionConfig.Runtime,
+		Role:         functionConfig.Role,
+		Handler:      handler,
+		RevisionId:   uuid,
+		LastModified: time.Now().Unix() * 1000,
+	}
+
+	s.functions[req.FunctionName] = newFunctionCfg
+	s.save()
+	s.cw.Info(SERVICE, "UpdateFunction", fmt.Sprintf("Updated Function config: %s", utils.MarshalIjson(newFunctionCfg)))
 	return newFunctionCfg, nil
 }
 

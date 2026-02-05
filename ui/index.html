@@ -651,17 +651,16 @@
         <div class="p-6 border-b border-neutral-800 flex justify-between items-center">
           <div>
             <h2 id="lambda-active-function-name" class="text-md font-bold text-white">function_name</h2>
-<!--            <p id="lambda-active-function-arn" class="text-[12px] text-gray-400 font-bold tracking-tighter">Lambda ARN</p>-->
           </div>
           <div class="flex gap-2">
             <button onclick="lambdaDeleteFunction()"
                     class="px-4 py-1.5 border border-red-900/50 text-red-700 text-xs font-bold rounded hover:bg-red-950/40 transition-all">
               Delete Function
             </button>
-<!--            <button onclick="lambdaOpenCodeUploadModal()"-->
-<!--                    class="px-4 py-1.5 bg-orange-600 text-white text-xs font-bold rounded hover:bg-orange-500 transition-all">-->
-<!--              Upload Code-->
-<!--            </button>-->
+            <button onclick="lambdaOpenUpdateFunctionModal()"
+                    class="px-4 py-1.5 bg-orange-600 text-white text-xs font-bold rounded hover:bg-orange-500 transition-all">
+              Update Function
+            </button>
           </div>
         </div>
 
@@ -912,7 +911,7 @@
 
         <div class="p-4 space-y-4">
           <div>
-            <label for="lambda-function-name" class="block text-[11px] text-gray-300 mb-2">Function Name (same as file/module name)</label>
+            <label for="lambda-function-name" class="block text-[11px] text-gray-400 mb-2">Function Name (same as file/module name)</label>
             <input id="lambda-function-name" type="text" placeholder="fileName or module name without extension"
                    oninput="onLambdaFunctionNameInput(this)"
                    class="w-full bg-black/50 border border-neutral-800 rounded-lg px-4 py-2 text-sm font-mono text-white outline-none focus:border-orange-500 transition-all">
@@ -922,7 +921,7 @@
           </div>
 
           <div>
-            <label for="lambda-runtime-selector" class="block text-[11px] text-gray-300 mb-2">Runtime</label>
+            <label for="lambda-runtime-selector" class="block text-[11px] text-gray-400 mb-2">Runtime</label>
             <select id="lambda-runtime-selector"
                     class="bg-neutral-800 text-xs font-mono border border-neutral-700 rounded px-2 py-1 outline-none">
               <option value="">--Choose a runtime--</option>
@@ -932,13 +931,13 @@
           </div>
 
           <div>
-            <label for="lambda-function-handler" class="block text-[11px] text-gray-300 mb-2">Function Handler</label>
+            <label for="lambda-function-handler" class="block text-[11px] text-gray-400 mb-2">Function Handler</label>
             <input id="lambda-function-handler" type="text" placeholder="functionName.lambdaHandler"
                    class="w-full bg-black/50 border border-neutral-800 rounded-lg px-4 py-2 text-sm font-mono text-white outline-none focus:border-orange-500 transition-all">
           </div>
 
           <div>
-            <label for="lambda-code-upload" class="block text-[11px] text-gray-300 mb-2">Lambda Function Code (ZIP)</label>
+            <label for="lambda-code-upload" class="block text-[11px] text-gray-400 mb-2">Lambda Function Code (ZIP)</label>
 
             <input id="lambda-code-upload"
                    type="file"
@@ -974,23 +973,23 @@
 
         <div class="p-4 space-y-4">
           <div>
-            <label for="lambda-function-update-name" class="block text-[11px] text-gray-300 mb-2">Function Name</label>
-            <div id="lambda-function-update-name" class="block text-[11px] text-gray-300 mb-2"></div>
+            <label for="lambda-function-update-name" class="block text-[11px] text-gray-400 mb-2">Function Name</label>
+            <div id="lambda-function-update-name" class="block text-sm text-gray-300 ml-2 mb-2"></div>
           </div>
 
           <div>
-            <label for="lambda-function-update-runtime" class="block text-[11px] text-gray-300 mb-2">Runtime</label>
-            <div id="lambda-function-update-runtime" class="block text-[11px] text-gray-300 mb-2"></div>
+            <label for="lambda-function-update-runtime" class="block text-[11px] text-gray-400 mb-2">Runtime</label>
+            <div id="lambda-function-update-runtime" class="block text-sm text-gray-300 ml-2 mb-2"></div>
           </div>
 
           <div>
-            <label for="lambda-function-update-handler" class="block text-[11px] text-gray-300 mb-2">Function Handler</label>
+            <label for="lambda-function-update-handler" class="block text-[11px] text-gray-400 mb-2">Function Handler</label>
             <input id="lambda-function-update-handler" type="text" placeholder="functionName.lambdaHandler"
                    class="w-full bg-black/50 border border-neutral-800 rounded-lg px-4 py-2 text-sm font-mono text-white outline-none focus:border-orange-500 transition-all">
           </div>
 
           <div>
-            <label for="lambda-update-code-upload" class="block text-[11px] text-gray-300 mb-2">Lambda Function Code (ZIP)</label>
+            <label for="lambda-update-code-upload" class="block text-[11px] text-gray-400 mb-2">Lambda Function Code (ZIP)</label>
 
             <input id="lambda-update-code-upload"
                    type="file"

@@ -29,8 +29,8 @@ export async function lambdaLoadFunctions() {
   }
 }
 
-export async function lambdaSelectFunction(e) {
-  const lambdaFunction = JSON.parse(e.dataset.payload);
+export async function lambdaSelectFunction(e, functionConfigs) {
+  const lambdaFunction = functionConfigs ? functionConfigs : JSON.parse(e.dataset.payload);
   lambdaCurrentFunction = lambdaFunction;
   const lambdaFunctionCodeSection = document.getElementById('lambda-function-code-section');
 
@@ -43,8 +43,7 @@ export async function lambdaSelectFunction(e) {
   lambdaFunctionCodeSection.classList.add('hidden');
 
   document.getElementById('lambda-workspace').classList.remove('hidden');
-  document.getElementById(
-      'lambda-active-function-name').innerText = lambdaFunction.FunctionName;
+  document.getElementById('lambda-active-function-name').innerText = lambdaFunction.FunctionName;
 
   lambdaFunctionGrid.innerHTML = Object.entries(lambdaFunction)
   .map(([k, v]) => `
@@ -173,7 +172,7 @@ export async function lambdaPerformCreateFunction() {
       } else {
         eleFunctionCodeStatus.value = "Lambda function created successfully!";
 
-        await lambdaLoadFunctions()
+        await lambdaLoadFunctions();
 
         lambdaCloseCreateFunctionModal();
       }
@@ -198,4 +197,69 @@ export async function lambdaFunctionInvoke(e) {
   });
   let resp = await res.json();
   document.getElementById('lambda-function-output').innerText = JSON.stringify(resp);
+}
+
+export function lambdaOpenUpdateFunctionModal() {
+  document.getElementById('lambda-update-code-modal').classList.remove('hidden');
+  document.getElementById('lambda-function-update-name').innerText = lambdaCurrentFunction.FunctionName;
+  document.getElementById('lambda-function-update-runtime').innerText = lambdaCurrentFunction.Runtime;
+  document.getElementById('lambda-function-update-handler').value = lambdaCurrentFunction.Handler;
+  document.getElementById('lambda-update-code-upload').value = "";
+}
+
+export function lambdaCloseUpdateFunctionModal() {
+  document.getElementById('lambda-update-code-modal').classList.add('hidden');
+}
+
+export async function lambdaPerformUpdateFunction(){
+
+  const functionHandler = document.getElementById('lambda-function-update-handler').value;
+  const eleUpdatedCode = document.getElementById('lambda-update-code-upload');
+  const eleUpdatedCodeStatus = document.getElementById('lambda-function-update-code-hint');
+
+  if (eleUpdatedCode.files.length === 0) {
+    eleUpdatedCodeStatus.className = "mt-2 text-[10px] text-red-500";
+    eleUpdatedCodeStatus.value = "Please select a file first.";
+    return;
+  }
+  eleUpdatedCodeStatus.value = "";
+  eleUpdatedCodeStatus.className = "mt-2 text-[10px] text-neutral-500 italic";
+
+  const codeFile = eleUpdatedCode.files[0];
+  const reader = new FileReader();
+
+  reader.onload = async (event) => {
+    const base64String = event.target.result.split(',')[1];
+    // const arrayBuffer = event.target.result;
+    try {
+      eleUpdatedCodeStatus.innerText = "Processing...";
+      const res = await fetch(
+          '/dashboard/api/lambda/update-function',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              FunctionName: lambdaCurrentFunction.FunctionName,
+              Handler: functionHandler,
+              Code: {
+                ZipFile: base64String
+              }
+            })
+          });
+
+      if (!res.ok) {
+        eleUpdatedCodeStatus.value = "Code upload failed." + res.statusText;
+      } else {
+        eleUpdatedCodeStatus.value = "Lambda function updated successfully!";
+        const data = await res.json();
+
+        await lambdaSelectFunction(undefined, data.Function);
+
+        lambdaCloseUpdateFunctionModal();
+      }
+    } catch (error) {
+      eleUpdatedCodeStatus.value = "Error: " + error.message;
+    }
+  };
+
+  reader.readAsDataURL(codeFile);
 }
