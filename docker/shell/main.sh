@@ -114,6 +114,10 @@ fi
 if [ ${#PIDS[@]} -gt 0 ]; then
   sleep 2
   edge_dispatcher
+  sleep 1
+
+  echo -e "CloudLocal is up and running on port 10050..."
+  echo -e "Press Ctrl+C to shut down."
 fi
 
 # --- Keep alive ---
@@ -121,9 +125,6 @@ if [ ${#PIDS[@]} -eq 0 ]; then
   echo -e "No services were enabled. Check ENABLED_SERVICES env var."
   exit 1
 fi
-
-echo -e "CloudLocal is up and running on port 10050..."
-echo -e "Press Ctrl+C to shut down."
 
 # Wait for all background processes.
 wait

@@ -45,11 +45,7 @@ WORKDIR "$APP_HOME"
 
 # Install base dependencies and DynamoDB
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget  \
-    unzip  \
-    ca-certificates  \
-    libsqlite3-0 \
-    libatomic1 \
+    wget unzip ca-certificates libsqlite3-0 libatomic1 \
     && wget -q https://d1ni2b6xgvw0s0.cloudfront.net/v2.x/dynamodb_local_latest.zip -O /tmp/db.zip \
 #    && wget -q https://s3.us-west-2.amazonaws.com/dynamodb-local/dynamodb_local_latest.zip -O /tmp/db.zip \
     && mkdir -p "$APP_HOME/dynamodb_local_latest" \
@@ -73,10 +69,9 @@ COPY --from=python-extractor /usr/local/bin/python3.14 /usr/local/bin/python3
 COPY --from=python-extractor /usr/local/lib/python3.14 /usr/local/lib/python3.14
 COPY --from=python-extractor /usr/local/lib/libpython3.14.so.* /usr/local/lib/
 
+# 4. Copy CloudLocal binaries
 COPY ./docker/shims/node_shim.js $APP_HOME/shims/node_shim.js
 COPY ./docker/shims/python_shim.py $APP_HOME/shims/python_shim.py
-
-# 4. Copy CloudLocal binaries
 COPY --from=go-builder /app/cloudlocal-edge $APP_HOME/cloudlocal-edge
 COPY ./docker/shell/main.sh ${APP_HOME}/main.sh
 
