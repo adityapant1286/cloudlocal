@@ -6,7 +6,6 @@ services:
     build:
       context: ./
       no_cache: true
-#      dockerfile: ./docker/Dockerfile_b4_lambda
       dockerfile: ./docker/Dockerfile
     ports:
       - "10050-10070:10050-10070"
