@@ -79,9 +79,9 @@ export async function cwRefreshLogs() {
     level = level.replace(/WARN/g, '<span class="text-yellow-500 font-bold">WARN</span>');
 
     return `
-        <div class="pb-1 border-b border-neutral-900/30 flex gap-4 group hover:bg-white/5 transition-colors">
-            <span class="text-gray-300 shrink-0 select-none text-[10px]">${date}</span>
-            <span class="log-message-body text-gray-200 break-all">${level} - ${e.message}</span>
+        <div class="pb-1 mb-2 border-b border-neutral-700/70 flex gap-4 group hover:bg-white/5 transition-colors">
+            <span class="text-gray-300 shrink-0">${date}</span>
+            <span class="log-message-body text-gray-200 break-all whitespace-pre-wrap font-mono">${level} - ${e.message}</span>
         </div>`;
   }).join('');
 

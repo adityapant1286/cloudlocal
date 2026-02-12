@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -326,6 +327,7 @@ func (s *lambdaSvcImplementation) createFunction(body []byte) (*FunctionConfig, 
 		Runtime      string            `json:"Runtime"`
 		Role         string            `json:"Role"`
 		Handler      string            `json:"Handler"`
+		Environment  Environment       `json:"Environment"`
 		Code         map[string]string `json:"Code"`
 	}
 	utils.UnmarshalJson(body, &req)
@@ -359,6 +361,7 @@ func (s *lambdaSvcImplementation) createFunction(body []byte) (*FunctionConfig, 
 		Handler:      req.Handler,
 		RevisionId:   uuid,
 		FunctionArn:  arn,
+		Environment:  req.Environment,
 		LastModified: time.Now().Unix() * 1000,
 	}
 
@@ -375,6 +378,7 @@ func (s *lambdaSvcImplementation) updateFunction(body []byte) (*FunctionConfig, 
 	var req struct {
 		FunctionName string            `json:"FunctionName"`
 		Handler      string            `json:"Handler"`
+		Environment  Environment       `json:"Environment"`
 		Code         map[string]string `json:"Code"`
 	}
 	utils.UnmarshalJson(body, &req)
@@ -384,34 +388,36 @@ func (s *lambdaSvcImplementation) updateFunction(body []byte) (*FunctionConfig, 
 		return nil, errors.New("ResourceNotFoundException")
 	}
 
-	// delete existing
-	functionDir := filepath.Join(utils.LambdaDir, functionConfig.FunctionName)
-	s.cw.Info(SERVICE, "UpdateFunction", fmt.Sprintf("Deleting Lambda function: %s", utils.MarshalIjson(functionConfig)))
+	if req.Code != nil {
+		// create new
+		var code []byte
 
-	err := os.RemoveAll(functionDir)
-	if err != nil {
-		s.cw.Info(SERVICE, "UpdateFunction", fmt.Sprintf("Error in deleting Lambda function: %s", err.Error()))
-		return nil, err
-	}
+		if zipBase64, ok := req.Code["ZipFile"]; ok {
+			zipBytes, err := base64.StdEncoding.DecodeString(zipBase64)
+			if err != nil {
+				return nil, err
+			}
+			code = zipBytes
+		}
 
-	// create new
-	var code []byte
+		if code == nil {
+			return nil, errors.New("invalid file contents")
+		}
 
-	if zipBase64, ok := req.Code["ZipFile"]; ok {
-		zipBytes, err := base64.StdEncoding.DecodeString(zipBase64)
+		// delete existing
+		functionDir := filepath.Join(utils.LambdaDir, functionConfig.FunctionName)
+		s.cw.Info(SERVICE, "UpdateFunction", fmt.Sprintf("Deleting Lambda function: %s", utils.MarshalIjson(functionConfig)))
+
+		err := os.RemoveAll(functionDir)
 		if err != nil {
+			s.cw.Info(SERVICE, "UpdateFunction", fmt.Sprintf("Error in deleting Lambda function: %s", err.Error()))
 			return nil, err
 		}
-		code = zipBytes
-	}
 
-	if code == nil {
-		return nil, errors.New("invalid file contents")
-	}
-
-	xtractErr := s.extractZip(code, functionDir)
-	if xtractErr != nil {
-		return nil, xtractErr
+		xtractErr := s.extractZip(code, functionDir)
+		if xtractErr != nil {
+			return nil, xtractErr
+		}
 	}
 
 	var handler string
@@ -429,6 +435,7 @@ func (s *lambdaSvcImplementation) updateFunction(body []byte) (*FunctionConfig, 
 		Role:         functionConfig.Role,
 		Handler:      handler,
 		RevisionId:   uuid,
+		Environment:  req.Environment,
 		LastModified: time.Now().Unix() * 1000,
 	}
 
@@ -486,12 +493,6 @@ func (s *lambdaSvcImplementation) invokeLocal(req InvokeRequest) (string, error)
 	case "nodejs25.x":
 		cmd = s.node(ctx, functionConfig, req)
 
-	//case "java21":
-	//	cmd = s.java(ctx, functionConfig, req)
-	//
-	//case "java":
-	//	cmd = s.java(ctx, functionConfig, req)
-
 	default:
 		return "", fmt.Errorf("runtime %s not supported yet", functionConfig.Runtime)
 	}
@@ -503,18 +504,62 @@ func (s *lambdaSvcImplementation) invokeLocal(req InvokeRequest) (string, error)
 	cmd.Stderr = &stderr
 	cmd.Dir = filepath.Join(utils.LambdaDir, functionConfig.FunctionName)
 
+	cmd.Env = os.Environ()
+	for k, v := range functionConfig.Environment.Variables {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+	}
+	cmd.Env = append(cmd.Env, "PYTHONUNBUFFERED=1")
+
 	err := cmd.Run()
 
+	rawStdout := stdout.String()
+	rawStderr := stderr.String()
+
+	// 1. Extract the result using Regex or String Split
+	var finalResult string
+	re := regexp.MustCompile(`(?s)<CLOUDLOCAL_RESULT>(.*?)</CLOUDLOCAL_RESULT>`)
+	match := re.FindStringSubmatch(rawStdout)
+
+	if len(match) > 1 {
+		finalResult = match[1]
+		// Clean up stdout for logging: remove the result tags and content
+		rawStdout = strings.Replace(rawStdout, match[0], "", 1)
+	} else {
+		// If no result tags found, something went wrong in the shim
+		finalResult = `{"error": "No result returned from shim"}`
+	}
+
+	// 2. Send EVERYTHING (Stdout + Stderr) to your Dashboard logs
+	combinedLogs := strings.TrimSpace(rawStdout)
+	if rawStderr != "" {
+		combinedLogs += "\n" + strings.TrimSpace(rawStderr)
+	}
+
+	if len(combinedLogs) > 0 {
+		s.cw.Info(SERVICE, functionConfig.FunctionName, combinedLogs)
+	}
+
+	// 3. Print to terminal for your debugging
+	log.Printf("[%s] LOGS: %s", functionConfig.FunctionName, combinedLogs)
+	log.Printf("[%s] RESULT: %s", functionConfig.FunctionName, finalResult)
+
 	if err != nil {
-		s.cw.Error(SERVICE, functionConfig.FunctionName, fmt.Sprintf("Err: %s, Stderr: %s", err.Error(), stderr.String()))
 		return "", err
 	}
 
-	outstr := stdout.String()
-	log.Printf("outstr: %s", outstr)
-	s.cw.Info(SERVICE, functionConfig.FunctionName, fmt.Sprintf("%s", outstr))
+	return finalResult, nil
 
-	return outstr, nil
+	//if err != nil {
+	//	s.cw.Error(SERVICE, functionConfig.FunctionName, fmt.Sprintf("Err: %s, Stderr: %s", err.Error(), stderr.String()))
+	//	return "", err
+	//}
+	//
+	//outstr := stdout.String()
+	//log.Printf("outstr: %s", outstr)
+	//log.Printf("stderr: %s", stderr.String())
+	//s.cw.Info(SERVICE, functionConfig.FunctionName, fmt.Sprintf("%s", outstr))
+	//
+	//return outstr, nil
 }
 
 func (s *lambdaSvcImplementation) python(ctx context.Context, config *FunctionConfig, req InvokeRequest) *exec.Cmd {
@@ -533,18 +578,6 @@ func (s *lambdaSvcImplementation) node(ctx context.Context, config *FunctionConf
 		"node",
 		"/opt/cloudlocal/shims/node_shim.js",
 		config.Handler,
-		req.Payload,
-	)
-}
-
-func (s *lambdaSvcImplementation) java(ctx context.Context, config *FunctionConfig, req InvokeRequest) *exec.Cmd {
-	// The Java based lambda function execution does not work.
-	// Need different strategy for Java functions.
-	return exec.CommandContext(
-		ctx,
-		"java",
-		"-jar",
-		utils.LambdaDir+"/"+config.FunctionName+"/"+config.FunctionName+".jar",
 		req.Payload,
 	)
 }

@@ -13,14 +13,19 @@ type InvokeRequest struct {
 	Payload      string `json:"payload"` // The JSON event
 }
 
+type Environment struct {
+	Variables map[string]string `json:"Variables"`
+}
+
 type FunctionConfig struct {
-	FunctionName string `json:"FunctionName"`
-	Runtime      string `json:"Runtime"`
-	Role         string `json:"Role"`
-	Handler      string `json:"Handler"`
-	RevisionId   string `json:"RevisionId"`
-	FunctionArn  string `json:"FunctionArn"`
-	LastModified int64  `json:"LastModified"`
+	FunctionName string      `json:"FunctionName"`
+	Runtime      string      `json:"Runtime"`
+	Role         string      `json:"Role"`
+	Handler      string      `json:"Handler"`
+	RevisionId   string      `json:"RevisionId"`
+	FunctionArn  string      `json:"FunctionArn"`
+	Environment  Environment `json:"Environment"`
+	LastModified int64       `json:"LastModified"`
 }
 
 type persistentState struct {

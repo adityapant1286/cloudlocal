@@ -1,14 +1,7 @@
 import sys
 import os
 import json
-import logging
 import importlib
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(levelname)s] %(asctime)s: %(message)s',
-    stream=sys.stderr
-)
 
 def run():
   # 1. Setup Path
@@ -21,10 +14,12 @@ def run():
 
     module_name, function_name = handler_str.split('.')
 
-    logging.info(f"Invoking handler '{module_name}.{function_name}'")
-
     # 3. Dynamic Import
-    module = importlib.import_module(module_name)
+    if module_name in sys.modules:
+      module = importlib.reload(sys.modules[module_name])
+    else:
+      module = importlib.import_module(module_name)
+
     handler = getattr(module, function_name)
 
     # 4. Parse Event
@@ -36,9 +31,7 @@ def run():
 
     # 6. Output ONLY the JSON result to stdout
     resp = json.dumps(result)
-    logging.info(resp)
-
-    sys.stdout.write(resp)
+    sys.stdout.write(f"\n<CLOUDLOCAL_RESULT>{resp}</CLOUDLOCAL_RESULT>\n")
     sys.stdout.flush()
 
   except Exception as e:
